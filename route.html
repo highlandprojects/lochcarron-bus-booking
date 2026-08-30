@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Service 704 — route check</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/4.7.1/maplibre-gl.min.css">
+<style>
+  :root{
+    --ink:#16232e; --ink-soft:#48606f; --line:#c8d4dc; --paper:#fff; --wash:#f2f6f8;
+    --blue:#1f5f8b; --blue-dark:#164a6d; --blue-wash:#e8f1f7; --green:#1d6b45;
+    --amber-wash:#fdf3e0; --amber-line:#c88a1e;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
+       color:var(--ink);background:var(--wash);font-size:16px;line-height:1.5}
+  header{background:var(--blue);color:#fff;padding:1rem}
+  header h1{margin:0;font-size:1.2rem}
+  header p{margin:.25rem 0 0;font-size:.9rem;opacity:.9}
+  .bar{display:flex;gap:.5rem;padding:.75rem 1rem;background:var(--paper);
+       border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5;flex-wrap:wrap}
+  .bar button{flex:1 1 auto;min-height:48px;font:inherit;font-weight:600;cursor:pointer;
+       border:2px solid var(--line);background:var(--paper);color:var(--blue);border-radius:10px;padding:.5rem 1rem}
+  .bar button[aria-pressed="true"]{background:var(--blue);color:#fff;border-color:var(--blue)}
+  #map{height:60vh;min-height:340px;width:100%}
+  .wrap{padding:1rem;max-width:760px;margin:0 auto}
+  table{width:100%;border-collapse:collapse;background:var(--paper);border:1px solid var(--line);
+        border-radius:10px;overflow:hidden}
+  th,td{padding:.6rem .7rem;text-align:left;border-bottom:1px solid #eef2f5;font-size:.95rem}
+  th{background:var(--blue-wash);color:var(--blue);font-size:.8rem;text-transform:uppercase;letter-spacing:.05em}
+  tr:last-child td{border-bottom:none}
+  .num{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;
+       border-radius:50%;background:var(--blue);color:#fff;font-size:.8rem;font-weight:700}
+  .num.local{background:var(--green)}
+  .tag{font-size:.75rem;padding:.1rem .45rem;border-radius:20px;background:#e6f2eb;color:var(--green)}
+  .tag.tt{background:var(--blue-wash);color:var(--blue)}
+  .note{background:var(--amber-wash);border-left:5px solid var(--amber-line);
+        padding:.8rem 1rem;border-radius:0 8px 8px 0;margin:1rem 0;font-size:.92rem}
+  .maplibregl-popup-content{font:inherit;font-size:.9rem;padding:.6rem .8rem}
+  footer{padding:1.5rem 1rem 3rem;text-align:center;color:var(--ink-soft);font-size:.85rem}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Service 704 — route check</h1>
+  <p>Every stop and the road the bus takes, straight from the live system.</p>
+</header>
+
+<div class="bar">
+  <button id="btn-out" aria-pressed="true">Lochcarron → Inverness</button>
+  <button id="btn-ret" aria-pressed="false">Inverness → Applecross</button>
+</div>
+
+<div id="map"></div>
+
+<div class="wrap">
+  <div class="note" id="summary">Loading…</div>
+  <table>
+    <thead><tr><th>#</th><th>Stop</th><th>Due</th><th>Kind</th></tr></thead>
+    <tbody id="rows"></tbody>
+  </table>
+  <p style="color:var(--ink-soft);font-size:.85rem;margin-top:1rem">
+    Blue numbers are stops on the registered timetable. Green are local pickup points.
+    Tap a stop on the map for its name. Times at local points are estimates until confirmed
+    on the road.
+  </p>
+</div>
+
+<footer>Lochcarron Garage · Service 704 · this page reads the live booking system, so it is always current.</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/4.7.1/maplibre-gl.min.js"></script>
+<script>
+"use strict";
+const URL_BASE = "https://sswidsjglvpbbthsqwdy.supabase.co";
+const KEY = "sb_publishable_HYylK1k8WEtN3RC56zXNXA_ViLb3Zuw";
+
+async function rpc(fn, args){
+  const r = await fetch(URL_BASE + "/rest/v1/rpc/" + fn, {
+    method:"POST",
+    headers:{apikey:KEY, Authorization:"Bearer "+KEY, "Content-Type":"application/json"},
+    body: JSON.stringify(args||{})
+  });
+  if(!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+let CFG=null, DATA={}, dir="outward", map=null, markers=[];
+
+function localTimes(d){
+  const raw = (CFG.wording||{})[d==="return"?"local_point_times_return":"local_point_times_outward"]||"";
+  const out={};
+  raw.split(";").forEach(p=>{const m=p.split("="); if(m.length===2) out[m[0].trim()]=m[1].trim();});
+  return out;
+}
+
+async function load(d){
+  if(DATA[d]) return DATA[d];
+  const stops = await rpc("bus_stops", {p_direction:d});
+  const printed={}; ((CFG.timetable||{})[d]||[]).forEach(t=>printed[t.name]=t);
+  const lt = localTimes(d);
+  DATA[d] = stops.map(s=>({
+    name:s.name, o:Number(s.route_order),
+    lat:Number(s.latitude), lng:Number(s.longitude),
+    official: s.point_type==="official",
+    time: (printed[s.name]&&printed[s.name].time) || lt[s.name] || null
+  })).sort((a,b)=>a.o-b.o);
+  return DATA[d];
+}
+
+function draw(){
+  const stops = DATA[dir];
+  const gj = (CFG.routes||{})[dir];
+  const coords = gj && gj.geometry && gj.geometry.coordinates;
+
+  document.getElementById("btn-out").setAttribute("aria-pressed", dir==="outward");
+  document.getElementById("btn-ret").setAttribute("aria-pressed", dir==="return");
+
+  const miles = gj && gj.properties && (gj.properties.distance_miles_as_routed || gj.properties.distance_miles);
+  document.getElementById("summary").innerHTML =
+    "<strong>" + stops.length + " stops</strong>, " +
+    (miles ? ("about " + miles + " miles of road drawn. ") : "") +
+    "If a pin is in the wrong place, say which one and where it should be.";
+
+  const rows = stops.map((s,i)=>
+    '<tr><td><span class="num'+(s.official?"":" local")+'">'+(i+1)+'</span></td>'+
+    '<td>'+s.name+'</td><td>'+(s.time||"—")+'</td>'+
+    '<td><span class="tag'+(s.official?" tt":"")+'">'+(s.official?"timetable":"local")+'</span></td></tr>'
+  ).join("");
+  document.getElementById("rows").innerHTML = rows;
+
+  markers.forEach(m=>m.remove()); markers=[];
+
+  if(map.getLayer("route")) map.removeLayer("route");
+  if(map.getSource("route")) map.removeSource("route");
+  if(coords){
+    map.addSource("route",{type:"geojson",data:{type:"Feature",geometry:{type:"LineString",coordinates:coords}}});
+    map.addLayer({id:"route",type:"line",source:"route",
+      paint:{"line-color":"#1f5f8b","line-width":4,"line-opacity":.85}});
+  }
+
+  const b = new maplibregl.LngLatBounds();
+  stops.forEach((s,i)=>{
+    const el = document.createElement("div");
+    el.textContent = String(i+1);
+    el.style.cssText = "width:26px;height:26px;border-radius:50%;color:#fff;font:700 12px sans-serif;"+
+      "display:flex;align-items:center;justify-content:center;border:2px solid #fff;"+
+      "box-shadow:0 1px 4px rgba(0,0,0,.4);background:"+(s.official?"#1f5f8b":"#1d6b45");
+    const m = new maplibregl.Marker({element:el}).setLngLat([s.lng,s.lat])
+      .setPopup(new maplibregl.Popup({offset:16}).setText(s.name + (s.time? " · "+s.time : "")))
+      .addTo(map);
+    markers.push(m);
+    b.extend([s.lng,s.lat]);
+  });
+  (coords||[]).forEach(c=>b.extend(c));
+  map.fitBounds(b, {padding:40, duration:0});
+}
+
+async function show(d){
+  dir = d;
+  await load(d);
+  draw();
+}
+
+(async function(){
+  CFG = await rpc("bus_page_config", {});
+  map = new maplibregl.Map({
+    container:"map",
+    style:{version:8,
+      sources:{osm:{type:"raster",tiles:["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
+        tileSize:256, attribution:"© OpenStreetMap contributors"}},
+      layers:[{id:"osm",type:"raster",source:"osm"}]},
+    center:[-5.0,57.5], zoom:8
+  });
+  map.addControl(new maplibregl.NavigationControl({showCompass:false}));
+  map.on("load", async ()=>{
+    await show("outward");
+    document.getElementById("btn-out").onclick = ()=>show("outward");
+    document.getElementById("btn-ret").onclick = ()=>show("return");
+  });
+})().catch(e=>{
+  document.getElementById("summary").textContent = "Could not load the route: " + e.message;
+});
+</script>
+</body>
+</html>
