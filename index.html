@@ -1,0 +1,1225 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bus 704 Booking Page</title>
+<style>
+  :root{
+    --ink:#16232e;
+    --ink-soft:#48606f;
+    --line:#c8d4dc;
+    --line-soft:#e3eaef;
+    --paper:#ffffff;
+    --wash:#f2f6f8;
+    --blue:#1f5f8b;
+    --blue-dark:#164a6d;
+    --blue-wash:#e8f1f7;
+    --green:#1d6b45;
+    --green-wash:#e6f2eb;
+    --amber-wash:#fdf3e0;
+    --amber-line:#c88a1e;
+    --red:#a32020;
+    --red-wash:#fbeaea;
+    --focus:#b8860b;
+  }
+  *{box-sizing:border-box;}
+  html{-webkit-text-size-adjust:100%;}
+  body{
+    margin:0;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+    font-size:19px; line-height:1.55; color:var(--ink); background:var(--wash);
+  }
+  header{background:var(--blue); color:#fff; padding:1.4rem 1rem;}
+  .wrap{max-width:640px; margin:0 auto; padding:0 1rem;}
+  header .wrap{padding:0 1rem;}
+  header h1{margin:0; font-size:1.5rem; line-height:1.2; letter-spacing:.01em;}
+  header p{margin:.35rem 0 0; opacity:.92; font-size:1rem;}
+  main{padding:1.9rem 0 4rem;}
+  .card{
+    background:var(--paper); border:1px solid var(--line);
+    border-radius:14px; padding:1.5rem; margin-bottom:1.25rem;
+  }
+  h2{font-size:1.4rem; margin:0 0 .3rem; line-height:1.25;}
+  .lede{color:var(--ink-soft); margin:0 0 1.4rem;}
+  .step{font-size:.85rem; letter-spacing:.09em; text-transform:uppercase;
+        color:var(--blue); font-weight:700; margin:0 0 .5rem;}
+  .progress{height:10px; background:#d0dce4; border-radius:5px; overflow:hidden;
+           margin:.25rem 0 1.6rem; box-shadow:inset 0 1px 2px rgba(0,0,0,.06);}
+  .progress i{display:block; height:100%; background:var(--blue); transition:width .3s ease;}
+
+  button, .btn{
+    font:inherit; font-weight:600; cursor:pointer;
+    border-radius:11px; border:2px solid transparent;
+    min-height:60px; padding:.85rem 1.3rem; width:100%;
+  }
+  .primary{background:var(--blue); color:#fff;}
+  .primary:hover{background:var(--blue-dark);}
+  .primary:disabled{background:#9fb4c2; cursor:not-allowed;}
+  .secondary{background:var(--paper); color:var(--blue); border-color:var(--line); margin-top:.7rem;}
+  .secondary:hover{border-color:var(--blue);}
+  .danger{background:var(--paper); color:var(--red); border-color:#e2b4b4;}
+  :focus-visible{outline:4px solid var(--focus); outline-offset:2px;}
+
+  .choice{
+    display:block; width:100%; text-align:left; background:var(--paper);
+    border:2px solid var(--line); border-radius:11px; padding:1rem 1.1rem;
+    margin-bottom:.7rem; min-height:64px;
+  }
+  .choice:hover:not(:disabled){border-color:var(--blue); background:var(--blue-wash);}
+  .choice[aria-pressed="true"]{border-color:var(--blue); background:var(--blue-wash);}
+  .choice:disabled{opacity:.55; cursor:not-allowed; background:var(--wash);}
+  .choice .top{display:flex; justify-content:space-between; align-items:baseline; gap:.8rem;}
+  .choice b{font-size:1.1rem;}
+  .choice small{display:block; color:var(--ink-soft); font-size:.9rem; margin-top:.15rem;}
+  .tag{font-size:.8rem; font-weight:700; padding:.2rem .55rem; border-radius:20px; white-space:nowrap;}
+  .tag.ok{background:var(--green-wash); color:var(--green);}
+  .tag.no{background:var(--red-wash); color:var(--red);}
+  .tag.req{background:var(--amber-wash); color:#7a5406;}
+
+  label{display:block; font-weight:600; margin:1.1rem 0 .35rem;}
+  label .hint{display:block; font-weight:400; color:var(--ink-soft); font-size:.92rem;}
+  input[type=text], input[type=tel], input[type=email], textarea, select{
+    font:inherit; width:100%; padding:.85rem .9rem; min-height:56px;
+    border:2px solid var(--line); border-radius:10px; background:var(--paper); color:var(--ink);
+  }
+  textarea{min-height:110px; resize:vertical;}
+  input:focus, textarea:focus, select:focus{border-color:var(--blue);}
+  .hp{position:absolute; left:-9999px; width:1px; height:1px; overflow:hidden;}
+
+  .counter{display:flex; align-items:center; gap:1rem; margin-top:.5rem;}
+  .counter button{width:64px; height:64px; min-height:64px; font-size:1.7rem; padding:0;
+    background:var(--paper); border:2px solid var(--line); color:var(--blue);}
+  .counter button:hover:not(:disabled){border-color:var(--blue);}
+  .counter output{font-size:1.9rem; font-weight:700; min-width:2.5rem; text-align:center;}
+
+  .check{display:flex; gap:.85rem; align-items:flex-start; margin-bottom:.7rem;
+         border:2px solid var(--line); border-radius:11px; padding:.9rem 1rem; cursor:pointer;}
+  .check:hover{border-color:var(--blue);}
+  .check input{width:26px; height:26px; margin:.15rem 0 0; flex:0 0 auto; accent-color:var(--blue);}
+  .check span{font-weight:600;}
+  .check small{display:block; font-weight:400; color:var(--ink-soft); font-size:.9rem;}
+
+  .note{background:var(--blue-wash); border-left:5px solid var(--blue);
+        padding:.9rem 1.1rem; border-radius:0 9px 9px 0; margin:1.1rem 0; font-size:.97rem;}
+  .warn{background:var(--amber-wash); border-left-color:var(--amber-line);}
+  .err{background:var(--red-wash); border-left:5px solid var(--red); color:#7a1717;
+       padding:.9rem 1.1rem; border-radius:0 9px 9px 0; margin:1.1rem 0; font-weight:600;}
+
+  dl.summary{margin:0; border-top:1px solid var(--line-soft);}
+  dl.summary div{display:flex; justify-content:space-between; gap:1rem;
+                 padding:.8rem 0; border-bottom:1px solid var(--line-soft);}
+  dl.summary dt{color:var(--ink-soft); flex:0 0 auto;}
+  dl.summary dd{margin:0; text-align:right; font-weight:600;}
+
+  .ref{font-size:2rem; font-weight:700; letter-spacing:.03em; color:var(--blue);
+       background:var(--blue-wash); padding:1rem; border-radius:11px; text-align:center; margin:1.2rem 0;}
+  .tick{width:64px; height:64px; border-radius:50%; background:var(--green-wash);
+        color:var(--green); display:flex; align-items:center; justify-content:center;
+        font-size:2rem; margin:0 auto 1rem;}
+  footer{text-align:center; padding:2rem 1rem 3rem; color:var(--ink-soft); font-size:.92rem;}
+  footer a{color:var(--blue);}
+  .tel{font-size:1.25rem; font-weight:700; color:var(--blue); text-decoration:none;}
+  .hidden{display:none;}
+  .offlist{background:var(--blue-wash); border:2px solid #b9d3e6; border-radius:12px;
+           padding:1.2rem; margin:1.8rem 0 1rem;}
+  .offlist-h{font-size:1.15rem; font-weight:700; margin:0 0 .35rem;}
+  .offlist-p{margin:0 0 1rem; color:var(--ink-soft); font-size:.97rem;}
+  .big{min-height:68px; font-size:1.08rem;}
+  .chosen{background:var(--green-wash); border-left:5px solid var(--green);
+          padding:1rem 1.1rem; border-radius:0 10px 10px 0; margin-bottom:.9rem;}
+  .chosen-l{margin:0; font-size:.85rem; letter-spacing:.06em; text-transform:uppercase;
+            color:var(--green); font-weight:700;}
+  .chosen-n{margin:.25rem 0 .3rem; font-size:1.2rem; font-weight:700;}
+  .chosen-t{margin:0; color:var(--ink-soft); font-size:.95rem;}
+  .chosen-moved{margin:.6rem 0 0; padding:.55rem .7rem; border-radius:8px;
+     background:#eef4fb; border:1px solid #c9dcf0; color:#22405c; font-size:.95rem;}
+  .pinfar{margin:.7rem 0 0; padding:.7rem .8rem; border-radius:8px;
+     background:#fdf3e6; border:1px solid #e6c99b; color:#5c4322; font-size:1rem;}
+  details.terms{border:2px solid var(--line); border-radius:11px; margin:1.1rem 0; background:var(--paper);}
+  details.terms summary{padding:1rem 1.1rem; cursor:pointer; font-weight:600; color:var(--blue);
+                        min-height:56px; display:flex; align-items:center;}
+  details.terms[open] summary{border-bottom:1px solid var(--line-soft);}
+  details.terms .body{padding:0 1.1rem 1.1rem; font-size:.95rem;}
+  details.terms h3{font-size:1rem; margin:1.1rem 0 .3rem;}
+  details.terms ul{margin:.3rem 0 0; padding-left:1.2rem;}
+  details.terms li{margin-bottom:.45rem;}
+  .maproom{border:2px solid var(--line); border-radius:12px; overflow:hidden; margin:1rem 0; background:var(--paper);}
+  .maproom .hd{background:var(--blue-wash); padding:.7rem 1rem; font-size:.9rem; color:var(--ink-soft);
+               border-bottom:1px solid var(--line);}
+  .maproom .ft{padding:.6rem 1rem; font-size:.85rem; color:var(--ink-soft); border-top:1px solid var(--line);}
+  #themap{height:360px; width:100%;}
+  .linkbox{background:var(--amber-wash); border:2px solid var(--amber-line); border-radius:11px;
+           padding:1rem 1.1rem; margin:1.1rem 0; font-size:.95rem;}
+  .linkbox a{word-break:break-all;}
+  .linkbox b{display:block; margin-bottom:.4rem; font-size:1.02rem;}
+  .spin{display:inline-block; width:22px; height:22px; border:3px solid #cfdbe4;
+        border-top-color:var(--blue); border-radius:50%; animation:sp 1s linear infinite;
+        vertical-align:middle; margin-right:.5rem;}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  @media (max-width:420px){ body{font-size:18px;} .card{padding:1.2rem;} }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <h1>Lochcarron Garage</h1>
+    <p>Service 704 &middot; Applecross to Inverness</p>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="progress" aria-hidden="true"><i id="bar" style="width:0"></i></div>
+  <div id="screens" aria-live="polite">
+    <div class="card"><h2><span class="spin"></span>One moment&hellip;</h2>
+      <p class="lede">Loading the timetable.</p></div>
+  </div>
+</main>
+
+<footer>
+  Lochcarron Garage, Lochcarron, Ross-shire IV54 8YS<br>
+  Telephone <a class="tel" href="tel:01520722997">01520 722997</a>
+</footer>
+
+<script>
+"use strict";
+
+/* ------------------------------------------------------------------
+   The real data layer. Everything the prototype faked now comes from
+   the database through eight public functions and nothing else.
+------------------------------------------------------------------ */
+const SUPABASE_URL = "https://sswidsjglvpbbthsqwdy.supabase.co";
+const ANON_KEY = "sb_publishable_HYylK1k8WEtN3RC56zXNXA_ViLb3Zuw";
+
+async function rpc(fn, args){
+  const res = await fetch(SUPABASE_URL + "/rest/v1/rpc/" + fn, {
+    method: "POST",
+    headers: {
+      "apikey": ANON_KEY,
+      "Authorization": "Bearer " + ANON_KEY,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(args || {})
+  });
+  const body = await res.json().catch(() => ({}));
+  if(!res.ok){
+    /* PostgREST wraps our plain-named errors in { message: "..." }. */
+    const code = (body && body.message) ? body.message : ("http_" + res.status);
+    const e = new Error(code); e.code = code; throw e;
+  }
+  return body;
+}
+
+/* Plain words for every error the database can raise at the public. */
+const ERRTEXT = {
+  unavailable: "Sorry — we cannot fit that many on that journey. Try fewer seats, another day, or telephone the garage.",
+  deadline_passed: "Booking for that day has closed. Please telephone the garage — but the bus may already be full.",
+  rate_limited: "That is a lot of bookings very quickly. Please wait a few minutes and try again, or telephone the garage.",
+  party_too_large_for_public_booking: "For a group that size, please telephone the garage on 01520 722997 so we can plan it properly.",
+  contact_required: "We need a mobile number or an email address, so we can send your booking and reach you if anything changes.",
+  conditions_not_accepted: "Please tick the box to accept the conditions of travel.",
+  pickup_required: "Please choose where we should pick you up.",
+  destination_required: "Please choose where you are going.",
+  boarding_in_setdown_only_section: "On the journey home we can set you down beyond Lochcarron, but we cannot pick you up there. Please choose a pickup at Lochcarron or before it.",
+  please_telephone_the_garage: "Please telephone the garage on 01520 722997 and we will sort this out with you.",
+  lead_passenger_name_required: "Please tell us the name of the person booking.",
+  invalid_journey_span: "The place you are going must be further along the route than your pickup.",
+  not_found: "We cannot find a booking with those details. Please check the reference and try again.",
+  date_in_past: "That day has already been. Please choose another.",
+  beyond_advance_window: "That is further ahead than we take bookings. Please choose a nearer day.",
+  not_an_operating_day: "The bus does not run that day.",
+  closed: "The service is not running that day.",
+  cancelled: "That journey has been cancelled. Please choose another day."
+};
+function plain(err){
+  const code = (err && err.code) || String(err && err.message || err);
+  return ERRTEXT[code] ||
+    "Something went wrong and your booking has NOT been made. Please try again, or telephone the garage on 01520 722997.";
+}
+
+/* A random identifier per browser, for the database's rate limiting.
+   It identifies a browser, never a person. */
+function fingerprint(){
+  try{
+    let fp = localStorage.getItem("bus704_fp");
+    if(!fp){ fp = "web-" + Math.random().toString(36).slice(2, 12); localStorage.setItem("bus704_fp", fp); }
+    return fp;
+  }catch(_){ return "web-" + Math.random().toString(36).slice(2, 12); }
+}
+
+/* ------------------------------------------------------------------
+   Loaded once at startup
+------------------------------------------------------------------ */
+let CFG = null;                 // bus_page_config
+const DIR = {};                 // per-direction: {dates, stops}
+const ROUTELINE = {};           // per-direction: {coords, cum, stopAlong}
+
+function wording(key, fallback){
+  return (CFG && CFG.wording && CFG.wording[key]) || fallback || "";
+}
+function phone(){ return (CFG && CFG.service && CFG.service.phone) || "01520 722997"; }
+function phoneLink(){
+  const p = phone();
+  return '<a class="tel" href="tel:' + p.replace(/\s/g, "") + '">' + esc(p).replace(/ /g, "&nbsp;") + "</a>";
+}
+function mapEnabled(){ return wording("public_map_enabled", "true") === "true"; }
+function messagingLive(){ return wording("public_messaging_live", "false") === "true"; }
+
+/* Times for the approved local points come as "Name=09:23; Name=09:35". */
+function localTimes(dir){
+  const raw = wording(dir === "return" ? "local_point_times_return" : "local_point_times_outward", "");
+  const out = {};
+  raw.split(";").forEach(part => {
+    const m = part.split("=");
+    if(m.length === 2) out[m[0].trim()] = m[1].trim();
+  });
+  return out;
+}
+
+async function loadDirection(dir){
+  if(DIR[dir]) return DIR[dir];
+  const [dates, stops] = await Promise.all([
+    rpc("bus_open_dates", {p_direction: dir}),
+    rpc("bus_stops", {p_direction: dir})
+  ]);
+  const times = localTimes(dir);
+  const printed = {};
+  ((CFG.timetable || {})[dir] || []).forEach(t => { printed[t.name] = t; });
+  const merged = stops.map(s => {
+    const p = printed[s.name];
+    return {
+      id: s.id, n: s.name, o: Number(s.route_order),
+      lat: Number(s.latitude), lng: Number(s.longitude),
+      desc: s.description || "",
+      local: s.point_type === "approved",
+      t: (p && p.time) || times[s.name] || null,
+      req: !!(p && p.request)
+    };
+  }).sort((a, b) => a.o - b.o);
+  /* A stop with no printed or supplied time gets one worked out from
+     its neighbours, the same way a pin does. */
+  merged.forEach(s => { if(!s.t) s.t = interpolateTimeByOrder(merged, s.o); });
+  DIR[dir] = {dates, stops: merged};
+  return DIR[dir];
+}
+
+function interpolateTimeByOrder(stops, order){
+  const timed = stops.filter(s => s.t);
+  let before = null, after = null;
+  timed.forEach(s => {
+    if(s.o <= order && (!before || s.o > before.o)) before = s;
+    if(s.o >= order && (!after || s.o < after.o)) after = s;
+  });
+  if(!before && !after) return null;
+  if(!before) return after.t;
+  if(!after || after.o === before.o) return before.t;
+  const frac = (order - before.o) / (after.o - before.o);
+  const m0 = hm(before.t), m1 = hm(after.t);
+  return mh(Math.round(m0 + (m1 - m0) * frac));
+}
+function hm(t){ const [h, m] = t.split(":").map(Number); return h * 60 + m; }
+function mh(total){
+  total = ((total % 1440) + 1440) % 1440;
+  return String(Math.floor(total / 60)).padStart(2, "0") + ":" + String(total % 60).padStart(2, "0");
+}
+function minusMinutes(t, mins){ return mh(hm(t) - mins); }
+
+/* ------------------------------------------------------------------
+   The road, for the map: real geometry from the database, with each
+   stop's position measured along it so a pin can be described the way
+   a driver thinks - "about 2 miles past Kishorn".
+------------------------------------------------------------------ */
+const R_EARTH = 6371000;
+function havM(a, b){ // [lng,lat] pairs -> metres
+  const dLat = (b[1] - a[1]) * Math.PI / 180, dLng = (b[0] - a[0]) * Math.PI / 180;
+  const la1 = a[1] * Math.PI / 180, la2 = b[1] * Math.PI / 180;
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(la1) * Math.cos(la2) * Math.sin(dLng / 2) ** 2;
+  return 2 * R_EARTH * Math.asin(Math.sqrt(h));
+}
+function routeFor(dir){
+  if(ROUTELINE[dir]) return ROUTELINE[dir];
+  const gj = (CFG.routes || {})[dir];
+  const coords = gj && gj.geometry && gj.geometry.coordinates;
+  if(!coords || coords.length < 2) return null;
+  const cum = [0];
+  for(let i = 1; i < coords.length; i++) cum.push(cum[i - 1] + havM(coords[i - 1], coords[i]));
+  const line = {coords, cum};
+  line.alongOf = (lnglat) => projectToLine(line, lnglat);
+  /* Where each stop sits along the road. */
+  line.stopAlong = {};
+  (DIR[dir] ? DIR[dir].stops : []).forEach(s => {
+    line.stopAlong[s.n] = projectToLine(line, [s.lng, s.lat]).along;
+  });
+  ROUTELINE[dir] = line;
+  return line;
+}
+/* Nearest point on the polyline: checks every segment with a local
+   flat-earth projection, which is comfortably accurate at this scale. */
+function projectToLine(line, p){
+  const {coords, cum} = line;
+  const cosLat = Math.cos(p[1] * Math.PI / 180);
+  const M = Math.PI / 180 * R_EARTH;
+  const px = p[0] * cosLat * M, py = p[1] * M;
+  let best = {off: Infinity, along: 0, point: coords[0]};
+  for(let i = 0; i < coords.length - 1; i++){
+    const a = coords[i], b = coords[i + 1];
+    const ax = a[0] * cosLat * M, ay = a[1] * M, bx = b[0] * cosLat * M, by = b[1] * M;
+    const dx = bx - ax, dy = by - ay;
+    const L2 = dx * dx + dy * dy;
+    let t = L2 ? ((px - ax) * dx + (py - ay) * dy) / L2 : 0;
+    t = Math.max(0, Math.min(1, t));
+    const qx = ax + t * dx, qy = ay + t * dy;
+    const off = Math.hypot(px - qx, py - qy);
+    if(off < best.off){
+      best = {
+        off,
+        along: cum[i] + t * (cum[i + 1] - cum[i]),
+        point: [qx / (cosLat * M), qy / M]
+      };
+    }
+  }
+  return best;
+}
+
+/* A pin's position, in a driver's terms. Only official and approved
+   stops with a position in this direction take part. */
+function describeAlong(dir, along){
+  const line = routeFor(dir);
+  const stops = DIR[dir].stops;
+  const withAlong = stops.map(s => ({s, at: line.stopAlong[s.n]}))
+                         .filter(x => x.at !== undefined)
+                         .sort((a, b) => a.at - b.at);
+  /* Snap to a stop when the pin lands beside one. PROVISIONAL distance,
+     like the catchment rule itself - to be agreed with Malcolm. */
+  const STOP_SNAP_M = 400;
+  for(const x of withAlong){
+    if(Math.abs(x.at - along) <= STOP_SNAP_M){
+      return {snapped: x.s, order: x.s.o, time: x.s.t, text: "At " + x.s.n};
+    }
+  }
+  let from = withAlong[0], to = withAlong[withAlong.length - 1];
+  for(let i = 0; i < withAlong.length - 1; i++){
+    if(along >= withAlong[i].at && along <= withAlong[i + 1].at){
+      from = withAlong[i]; to = withAlong[i + 1]; break;
+    }
+  }
+  if(along < withAlong[0].at) return {snapped: withAlong[0].s, order: withAlong[0].s.o, time: withAlong[0].s.t, text: "At " + withAlong[0].s.n};
+  if(along > withAlong[withAlong.length - 1].at){
+    const last = withAlong[withAlong.length - 1];
+    return {snapped: last.s, order: last.s.o, time: last.s.t, text: "At " + last.s.n};
+  }
+  const span = to.at - from.at || 1;
+  const frac = (along - from.at) / span;
+  const order = from.s.o + frac * (to.s.o - from.s.o);
+  const time = (from.s.t && to.s.t) ? mh(Math.round(hm(from.s.t) + (hm(to.s.t) - hm(from.s.t)) * frac)) : (from.s.t || to.s.t);
+  const past = Math.round(((along - from.at) / 1609.34) * 10) / 10;
+  return {
+    snapped: null, order, time,
+    text: "Between " + from.s.n + " and " + to.s.n + " — about " + past + (past === 1 ? " mile" : " miles") + " past " + from.s.n
+  };
+}
+
+/* ------------------------------------------------------------------
+   "Be waiting by" wording - same two situations as the prototype.
+------------------------------------------------------------------ */
+function isPublishedStop(stop){ return stop && !stop.pinned && !stop.local; }
+function waitingAdvice(stop, time){
+  if(!time) return {due: "", by: "", why: "Please be waiting in good time — our stops are many miles apart."};
+  const by = minusMinutes(time, 10);
+  if(isPublishedStop(stop)){
+    return {
+      due: "Your bus is due at <strong>" + time + "</strong>.",
+      by,
+      why: "Please be waiting by <strong>" + by + "</strong>. Our stops are many miles apart and there is no second chance if you miss it."
+    };
+  }
+  return {
+    due: "Your bus is due at about <strong>" + time + "</strong>.",
+    by,
+    why: "Please be waiting by <strong>" + by + "</strong>. There is no published time for this spot &mdash; it is worked out from the stops on either side, so it can vary in either direction. If nobody has booked the request stops before yours, the bus does not call there and can reach you sooner."
+  };
+}
+
+/* ------------------------------------------------------------------
+   State and rendering - the prototype's machine, kept as it was.
+------------------------------------------------------------------ */
+const state = {
+  step: 0, direction: null, date: null,
+  pickup: null, pickupPin: null, pickupDesc: "",
+  dest: null, party: 1, lead: "", others: [],
+  reqs: {}, reqOther: "", mobile: "", email: "", landline: "", area: "", terms: false, hp: "",
+  mapOpen: false, pinTooFar: false,
+  availability: null, availabilityFor: "",
+  booked: [], lastRef: "", lastToken: "", outwardDate: null, pairing: false,
+  submitting: false, submitError: "",
+  cRef: "", cContact: "", cError: "", cBusy: false, cCancelledRef: "",
+  manage: null, manageError: "", manageBusy: false
+};
+
+const el = (h) => { const t = document.createElement("template"); t.innerHTML = h.trim(); return t.content.firstElementChild; };
+const esc = (s) => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+const SCREENS = [start, pickDate, pickPickup, pickDest, pickParty, pickReqs, pickContact, review, done,
+                 /* 9, 10, 11 */ cancelFind, cancelDone, manageScreen];
+
+let lastRenderedStep = null;
+function render(){
+  const sameStep = (lastRenderedStep === state.step);
+  const keepY = window.scrollY;
+  const inBooking = state.step >= 1 && state.step <= 8;
+  document.getElementById("bar").style.width = (inBooking ? (state.step / 8 * 100) : 0) + "%";
+  document.getElementById("bar").parentElement.style.visibility = inBooking ? "visible" : "hidden";
+  const host = document.getElementById("screens");
+  host.innerHTML = "";
+  host.appendChild(SCREENS[state.step]());
+  if(sameStep){
+    window.scrollTo({top: keepY, behavior: "instant"});
+  } else {
+    window.scrollTo({top: 0, behavior: "smooth"});
+    const h = host.querySelector("h2");
+    if(h){ h.setAttribute("tabindex", "-1"); h.focus({preventScroll: true}); }
+  }
+  lastRenderedStep = state.step;
+}
+const go = n => { state.step = n; render(); };
+const next = () => go(state.step + 1);
+const back = () => go(state.step - 1);
+function stepHead(n, title, lede){
+  return '<p class="step">Step ' + n + ' of 7</p><h2>' + title + '</h2>' + (lede ? '<p class="lede">' + lede + '</p>' : '');
+}
+function backBtn(){ return '<button class="secondary" onclick="BACK()">Go back</button>'; }
+window.BACK = back;
+
+function fmtDate(iso){
+  const [y, m, d] = iso.split("-").map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString("en-GB", {weekday: "long", day: "numeric", month: "long"});
+}
+
+/* ---------------- 1. Start ---------------- */
+function start(){
+  return el('<div class="card">' +
+    '<h2>704 Bus Route &mdash; Book a Seat</h2>' +
+    '<p class="lede">Applecross and Lochcarron to Inverness, every Monday and Saturday.</p>' +
+    '<div class="note">' +
+      '<strong>' + esc(wording("booking_deadline_public_wording", "Booking online closes at 6pm the day before you travel.")) + '</strong><br><br>' +
+      esc(wording("booking_deadline_telephone_wording", "")) + ' Telephone ' + phoneLink() + '.<br><br>' +
+      '<strong>Plans changed? No problem!</strong> Please let us know by using the ' +
+      '<strong>Cancel Booking</strong> link at any time, even on the morning of travel. ' +
+      'It saves the driver waiting for you.' +
+    '</div>' +
+    '<button class="primary" onclick="START()">Book the Bus</button>' +
+    '<button class="secondary" onclick="CANCELSTART()">Cancel a booking</button>' +
+  '</div>');
+}
+window.START = () => next();
+
+/* ---------------- 2. Date and journey ---------------- */
+function pickDate(){
+  const pairing = state.pairing && state.direction === "return" && state.outwardDate;
+  const c = el('<div class="card">' + stepHead(1,
+      pairing ? "When are you coming home?" : "When are you travelling?",
+      pairing ? "" : "Choose the journey first, then the day.") +
+    '<div id="dir"></div><div id="days"></div>' + backBtn() + '</div>');
+  const dir = c.querySelector("#dir");
+
+  if(!pairing){
+    [["outward", "Going to Inverness", "Leaves Toscaig 07:45, arrives Inverness 11:25"],
+     ["return", "Coming home from Inverness", "Leaves Inverness 15:00, arrives Toscaig 18:20"]]
+    .forEach(([k, l, s]) => {
+      const first = (DIR[k] && DIR[k].stops) || [];
+      const b = el('<button class="choice" aria-pressed="' + (state.direction === k) + '">' +
+        '<div class="top"><b>' + l + '</b></div><small>' + s + '</small></button>');
+      b.onclick = () => { state.direction = k; state.pickup = null; state.dest = null; state.date = null; ensureDirection(); };
+      dir.appendChild(b);
+    });
+    if(!state.direction) return c;
+  } else {
+    dir.appendChild(el('<div class="note">Your journey out is <strong>' + fmtDate(state.outwardDate) +
+      '</strong>, so we are showing that day onwards.</div>'));
+  }
+
+  const data = DIR[state.direction];
+  const days = c.querySelector("#days");
+  if(!data){
+    days.appendChild(el('<p class="lede"><span class="spin"></span>Checking the calendar&hellip;</p>'));
+    return c;
+  }
+  if(!pairing) days.appendChild(el('<label style="margin-top:1.6rem">Which day?</label>'));
+  data.dates.forEach(d => {
+    if(pairing && d.service_date < state.outwardDate) return;
+    const ok = d.is_open;
+    const b = el('<button class="choice" aria-pressed="' + (state.date === d.service_date) + '" ' + (ok ? '' : 'disabled') + '>' +
+      '<div class="top"><b>' + fmtDate(d.service_date) + '</b>' +
+        ((pairing && d.service_date === state.outwardDate) ? ' <small>Same day</small>' : '') +
+        '<span class="tag ' + (ok ? 'ok">Open' : 'no">Not available online') + '</span></div>' +
+      (ok ? '' : '<small>' + esc(wording("after_deadline_public_wording", "Please telephone the garage.")) + '</small>') +
+    '</button>');
+    b.onclick = () => { state.date = d.service_date; state.availability = null; next(); };
+    days.appendChild(b);
+  });
+  return c;
+}
+async function ensureDirection(){
+  render();
+  try{
+    await loadDirection(state.direction);
+    routeFor(state.direction);
+    render();
+  }catch(e){ fatal(e); }
+}
+
+/* ---------------- 3. Pickup ---------------- */
+function boardableStops(){
+  const cut = (CFG.service.setdown_only_after || {})[state.direction];
+  return DIR[state.direction].stops.map(s => ({...s, setdownOnly: cut != null && s.o > Number(cut)}));
+}
+function pickPickup(){
+  if(state.pickup) return pickupChosen();
+  const c = el('<div class="card">' + stepHead(2, "Where shall we pick you up?",
+      "Choose a stop, or show us a place on the road.") +
+    '<div id="list"></div>' +
+    (mapEnabled()
+      ? '<div class="offlist">' +
+          '<p class="offlist-h">Not on the list?</p>' +
+          '<p class="offlist-p">' + esc(wording("pin_help_text",
+            "It does not have to be a bus stop or a house. A passing place, a road end or a gate is fine.")) + '</p>' +
+          '<button class="primary big" id="openmap"><span aria-hidden="true">📍</span> Choose a place on the map</button>' +
+        '</div>'
+      : '<div class="offlist">' +
+          '<p class="offlist-h">Not on the list?</p>' +
+          '<p class="offlist-p">Telephone ' + phoneLink() + ' and we will arrange a pickup along the route with you.</p>' +
+        '</div>') +
+    backBtn() + '</div>');
+
+  const list = c.querySelector("#list");
+  boardableStops().forEach(s => {
+    const b = el('<button class="choice" ' + (s.setdownOnly ? 'disabled' : '') + '>' +
+      '<div class="top"><b>' + esc(s.n) + '</b><span>' + esc(s.t || "") + '</span></div>' +
+      (s.setdownOnly ? '<small>Set down only on the journey home — we cannot pick you up here</small>'
+        : s.local ? '<small>Local pickup point</small>'
+        : (s.req ? '<small>On request — we come here when someone has booked</small>' : '')) +
+    '</button>');
+    if(!s.setdownOnly) b.onclick = () => {
+      state.pickup = s; state.pickupPin = null; state.pickupDesc = ""; state.pinTooFar = false; state.availability = null; render();
+    };
+    list.appendChild(b);
+  });
+
+  const om = c.querySelector("#openmap");
+  if(om) om.onclick = () => { state.mapOpen = true; state.pickup = null; state.pinTooFar = false; render(); };
+  if(state.mapOpen && mapEnabled()){
+    const slot = el('<div></div>');
+    c.querySelector(".offlist").appendChild(slot);
+    mountMap(slot);
+  }
+  return c;
+}
+
+function pickupChosen(){
+  const pinned = !!state.pickupPin;
+  const info = pinned ? state.pickupPin.info : null;
+  const time = pinned ? info.time : state.pickup.t;
+  const c = el('<div class="card">' + stepHead(2, "Where shall we pick you up?", "") +
+    '<div class="chosen">' +
+      '<p class="chosen-l">Picking you up at</p>' +
+      '<p class="chosen-n">' + esc(pinned ? info.text : state.pickup.n) + '</p>' +
+      '<p class="chosen-t">Due at ' + (isPublishedStop(state.pickup) ? '' : 'about ') + esc(time || "") +
+        ' &middot; <strong>be waiting by ' + esc(time ? minusMinutes(time, 10) : "") + '</strong></p>' +
+      (pinned && info.snapped ? '<p class="chosen-t">That is one of our stops, so we will pick you up there.</p>' : '') +
+      (pinned && state.pickupPin.moved && !info.snapped
+        ? '<p class="chosen-moved">The bus can only stop on the road, so we have put your stop at the nearest point on the route. Please wait there.</p>' : '') +
+    '</div>' +
+    '<button class="secondary" id="change">Choose somewhere else</button>' +
+    '<div id="mapslot"></div>' +
+    '<label for="pd">Anything that helps the driver find you?' +
+      '<span class="hint">Optional. Which side of the road, a landmark, a gate, the colour of your coat — whatever you would tell a neighbour.</span></label>' +
+    '<textarea id="pd" placeholder="e.g. outside the shop, on the near side">' + esc(state.pickupDesc) + '</textarea>' +
+    '<button class="primary" style="margin-top:1.2rem" onclick="PINNEXT()">Continue</button>' +
+    backBtn() + '</div>');
+
+  c.querySelector("#pd").oninput = e => state.pickupDesc = e.target.value;
+  c.querySelector("#change").onclick = () => {
+    state.pickup = null; state.pickupPin = null; state.pickupDesc = ""; state.mapOpen = false; state.pinTooFar = false; render();
+  };
+  if(pinned){
+    const m = el('<div><p class="hint" style="margin:.9rem 0 .2rem">Tap the map to move your pin.</p></div>');
+    c.querySelector("#mapslot").appendChild(m);
+    mountMap(m);
+  }
+  return c;
+}
+window.PINNEXT = () => next();
+
+/* ---------------- 4. Destination ---------------- */
+function pickDest(){
+  const stops = DIR[state.direction].stops.filter(s => s.o > state.pickup.o);
+  const c = el('<div class="card">' + stepHead(3, "Where are you going?", "") + '<div id="list"></div>' + backBtn() + '</div>');
+  const list = c.querySelector("#list");
+  if(!stops.length) list.appendChild(el('<div class="err">There is nowhere further along this journey. Please go back and choose a different pickup.</div>'));
+  stops.forEach(s => {
+    const b = el('<button class="choice" aria-pressed="' + !!(state.dest && state.dest.id === s.id) + '">' +
+      '<div class="top"><b>' + esc(s.n) + '</b><span>' + esc(s.t || "") + '</span></div></button>');
+    b.onclick = () => { state.dest = s; state.availability = null; next(); };
+    list.appendChild(b);
+  });
+  return c;
+}
+
+/* ---------------- 5. Passengers ---------------- */
+function availabilityKey(){
+  return [state.date, state.direction, state.party,
+          state.pickup ? state.pickup.o : "", state.dest ? state.dest.o : ""].join("|");
+}
+async function checkAvailability(){
+  const key = availabilityKey();
+  state.availability = null; state.availabilityFor = key;
+  render();
+  try{
+    const answer = await rpc("bus_availability", {
+      p_service_date: state.date, p_direction: state.direction,
+      p_party: state.party, p_board: state.pickup.o, p_alight: state.dest.o
+    });
+    if(state.availabilityFor === key){ state.availability = answer; render(); }
+  }catch(e){
+    if(state.availabilityFor === key){ state.availability = "unavailable"; render(); }
+  }
+}
+function pickParty(){
+  if(state.availabilityFor !== availabilityKey()) checkAvailability();
+  const known = state.availability;
+  const c = el('<div class="card">' + stepHead(4, "Who is travelling?", "") +
+    '<label id="pl">How many seats, including yourself?</label>' +
+    '<div class="counter">' +
+      '<button onclick="PARTY(-1)" aria-label="One fewer">−</button>' +
+      '<output id="n" aria-labelledby="pl">' + state.party + '</output>' +
+      '<button onclick="PARTY(1)" aria-label="One more">+</button>' +
+    '</div>' +
+    '<div id="cap"></div>' +
+    '<label for="lead">Name of the person booking</label>' +
+    '<input id="lead" type="text" value="' + esc(state.lead) + '" autocomplete="name" placeholder="First name and surname">' +
+    '<div id="others"></div>' +
+    '<button class="primary" id="go" style="margin-top:1.6rem" disabled>Continue</button>' +
+    backBtn() + '</div>');
+
+  const lead = c.querySelector("#lead"), goBtn = c.querySelector("#go");
+  const check = () => { goBtn.disabled = lead.value.trim().length < 2 || known !== "available"; };
+  lead.oninput = e => { state.lead = e.target.value; check(); };
+  goBtn.onclick = () => next();
+
+  if(state.party > 1){
+    const box = el('<div><label style="margin-top:1.5rem">Other passengers’ names' +
+      '<span class="hint">Not required — but it helps the driver, and it helps us if plans change.</span></label></div>');
+    for(let i = 1; i < state.party; i++){
+      const inp = el('<input type="text" style="margin-bottom:.6rem" placeholder="Passenger ' + (i + 1) + '" value="' + esc(state.others[i - 1] || "") + '">');
+      inp.oninput = e => { state.others[i - 1] = e.target.value; };
+      box.appendChild(inp);
+    }
+    c.querySelector("#others").appendChild(box);
+  }
+  const cap = c.querySelector("#cap");
+  if(known === null){
+    cap.appendChild(el('<p class="lede"><span class="spin"></span>Checking there is room&hellip;</p>'));
+  } else if(known !== "available"){
+    cap.appendChild(el('<div class="err">Sorry — we cannot fit ' + state.party +
+      ' on that journey. Try fewer seats, another day, or telephone the garage on ' + esc(phone()) + '.</div>'));
+  }
+  check();
+  return c;
+}
+window.PARTY = (d) => {
+  state.party = Math.max(1, Math.min(12, state.party + d));
+  state.others.length = state.party - 1;
+  render();   /* pickParty notices the changed party and re-checks the room */
+};
+
+/* ---------------- 6. Requirements ---------------- */
+const REQUIREMENTS = [
+  {k: "folding_wheelchair", l: "Folding wheelchair",
+   d: "By prior arrangement only. The minibus is not wheelchair accessible and you must be able to board safely."},
+  {k: "walking_aid",   l: "Walking stick or frame", d: ""},
+  {k: "pushchair",     l: "Pushchair",              d: ""},
+  {k: "large_luggage", l: "Large or unusual luggage", d: "May need the trailer. We will be in touch if so."},
+  {k: "bicycle",       l: "Bicycle",                d: "May need the trailer. We will be in touch if so."},
+  {k: "dog",           l: "Dog",                    d: "We will do our best, but we cannot promise if another passenger objects."},
+  {k: "other",         l: "Something else",         d: ""}
+];
+function pickReqs(){
+  const c = el('<div class="card">' + stepHead(5, "Anything we should know?",
+    "Leave it all blank if not. Nothing here is required.") + '<div id="r"></div>' +
+    '<div class="note warn"><strong>Please note.</strong> The minibus is not wheelchair accessible. ' +
+    'A folding wheelchair can be carried by prior arrangement if you are able to board safely. ' +
+    'Some luggage and bicycles need the trailer — we will telephone you if so.</div>' +
+    '<button class="primary" onclick="RNEXT()">Continue</button>' + backBtn() + '</div>');
+  const box = c.querySelector("#r");
+  REQUIREMENTS.forEach(r => {
+    const lab = el('<label class="check"><input type="checkbox" ' + (state.reqs[r.k] ? 'checked' : '') + '>' +
+      '<span>' + esc(r.l) + (r.d ? '<small>' + esc(r.d) + '</small>' : '') + '</span></label>');
+    lab.querySelector("input").onchange = e => { state.reqs[r.k] = e.target.checked; render(); };
+    box.appendChild(lab);
+    if(r.k === "other" && state.reqs.other){
+      const d = el('<div style="margin:-.2rem 0 1rem"><label for="ro">What is it?</label>' +
+        '<textarea id="ro" placeholder="e.g. a folding easel, a crate of plants, a tiger">' + esc(state.reqOther) + '</textarea></div>');
+      d.querySelector("#ro").oninput = e => { state.reqOther = e.target.value; };
+      box.appendChild(d);
+    }
+  });
+  return c;
+}
+window.RNEXT = () => next();
+
+/* ---------------- 7. Contact ---------------- */
+function pickContact(){
+  const c = el('<div class="card">' + stepHead(6, "How do we reach you?",
+    "We need one of these so we can send your booking and a link to cancel it.") +
+    '<label for="mob">Mobile number<span class="hint">We will text your booking to this number.</span></label>' +
+    '<input id="mob" type="tel" inputmode="tel" autocomplete="tel" value="' + esc(state.mobile) + '" placeholder="07700 900123">' +
+    '<label for="em">Or email address</label>' +
+    '<input id="em" type="email" inputmode="email" autocomplete="email" value="' + esc(state.email) + '" placeholder="you@example.com">' +
+    '<label for="ll">Landline <span class="hint">Optional — useful if we need to ring you on the day.</span></label>' +
+    '<input id="ll" type="tel" value="' + esc(state.landline) + '" placeholder="01520 000000">' +
+    '<label for="ar">Which village or area are you from? <span class="hint">Optional. We never ask for your full address.</span></label>' +
+    '<input id="ar" type="text" value="' + esc(state.area) + '" placeholder="e.g. Applecross">' +
+    '<div class="hp" aria-hidden="true"><label>Website<input id="hp" type="text" tabindex="-1" autocomplete="off"></label></div>' +
+    '<button class="primary" id="go" style="margin-top:1.6rem" disabled>Continue</button>' + backBtn() + '</div>');
+  const m = c.querySelector("#mob"), e2 = c.querySelector("#em"), goBtn = c.querySelector("#go");
+  const check = () => { goBtn.disabled = !(m.value.trim() || e2.value.trim()); };
+  m.oninput = x => { state.mobile = x.target.value; check(); };
+  e2.oninput = x => { state.email = x.target.value; check(); };
+  c.querySelector("#ll").oninput = x => state.landline = x.target.value;
+  c.querySelector("#ar").oninput = x => state.area = x.target.value;
+  c.querySelector("#hp").oninput = x => state.hp = x.target.value;
+  goBtn.onclick = () => next();
+  check();
+  return c;
+}
+
+/* ---------------- 8. Review and submit ---------------- */
+function review(){
+  const reqs = REQUIREMENTS.filter(r => state.reqs[r.k]).map(r => r.l);
+  const pinned = !!state.pickupPin;
+  const pickupName = pinned ? state.pickupPin.info.text : state.pickup.n;
+  const time = pinned ? state.pickupPin.info.time : state.pickup.t;
+  const a = waitingAdvice(pinned ? {pinned: true} : state.pickup, time);
+  const c = el('<div class="card">' + stepHead(7, "Please check this is right", "") +
+    '<dl class="summary">' +
+      '<div><dt>Journey</dt><dd>' + (state.direction === "outward" ? "To Inverness" : "Home from Inverness") + '</dd></div>' +
+      '<div><dt>Day</dt><dd>' + fmtDate(state.date) + '</dd></div>' +
+      '<div><dt>Pick up</dt><dd>' + esc(pickupName) + '</dd></div>' +
+      '<div><dt>Getting off</dt><dd>' + esc(state.dest.n) + '</dd></div>' +
+      '<div><dt>Seats</dt><dd>' + state.party + '</dd></div>' +
+      '<div><dt>Name</dt><dd>' + esc(state.lead) + '</dd></div>' +
+      (reqs.length ? '<div><dt>Also bringing</dt><dd>' + esc(reqs.join(", ")) + '</dd></div>' : '') +
+      '<div><dt>We will contact you on</dt><dd>' + esc(state.mobile || state.email) + '</dd></div>' +
+    '</dl>' +
+    '<div class="note">' + a.due + '<br>' + a.why + '</div>' +
+    '<div class="note warn">If the exact spot you have chosen is not safe to stop at on the day, ' +
+      'the driver will pull in nearby. The bus does not leave the main route.</div>' +
+    '<details class="terms"><summary>Read the conditions of travel</summary>' +
+      '<div class="body">' + wording("conditions_of_travel_html", "") +
+      '<p style="margin-top:1.2rem;color:var(--ink-soft)">Lochcarron Garage, Lochcarron, Ross-shire IV54 8YS &middot; ' + esc(phone()) + '</p></div></details>' +
+    '<label class="check"><input type="checkbox" id="terms" ' + (state.terms ? 'checked' : '') + '>' +
+      '<span>I have read and accept the conditions of travel</span></label>' +
+    '<div id="suberr"></div>' +
+    '<button class="primary" id="go" style="margin-top:1.2rem" disabled>Confirm my booking</button>' +
+    backBtn() + '</div>');
+
+  const t = c.querySelector("#terms"), goBtn = c.querySelector("#go");
+  const sync = () => { goBtn.disabled = !state.terms || state.submitting; };
+  t.onchange = e => { state.terms = e.target.checked; sync(); };
+  if(state.submitError) c.querySelector("#suberr").appendChild(el('<div class="err">' + esc(state.submitError) + '</div>'));
+  if(state.submitting) goBtn.innerHTML = '<span class="spin"></span>Booking your seat&hellip;';
+  sync();
+  goBtn.onclick = submitBooking;
+  return c;
+}
+
+async function submitBooking(){
+  if(state.submitting) return;
+  state.submitting = true; state.submitError = ""; render();
+  const pinned = !!state.pickupPin;
+  const payload = {
+    service_date: state.date,
+    direction: state.direction,
+    board_route_order: pinned ? state.pickupPin.info.order : state.pickup.o,
+    alight_route_order: state.dest.o,
+    party_size: state.party,
+    lead_passenger_name: state.lead.trim(),
+    mobile: state.mobile.trim(), email: state.email.trim(), landline: state.landline.trim(),
+    home_area: state.area.trim(),
+    destination_point_id: state.dest.id,
+    conditions_accepted: "true",
+    fingerprint: fingerprint(),
+    website: state.hp || "",
+    other_passengers: state.others.filter(n => n && n.trim()).map(n => n.trim()),
+    requirements: REQUIREMENTS.filter(r => state.reqs[r.k]).map(r => ({
+      type: r.k, detail: r.k === "other" ? (state.reqOther || "").trim() : ""
+    })),
+    pickup_description: state.pickupDesc.trim(),
+    estimated_pickup_time: (pinned ? state.pickupPin.info.time : state.pickup.t) || ""
+  };
+  if(pinned && !state.pickupPin.info.snapped){
+    payload.pickup_latitude = String(state.pickupPin.lat);
+    payload.pickup_longitude = String(state.pickupPin.lng);
+  } else {
+    payload.pickup_point_id = pinned ? state.pickupPin.info.snapped.id : state.pickup.id;
+  }
+  try{
+    const res = await rpc("bus_submit_booking", {p_payload: payload});
+    if(!res || !res.ok) throw new Error((res && res.error) || "unknown");
+    state.lastRef = res.reference || "";
+    state.lastToken = res.manage_token || "";
+    const key = state.direction + "|" + state.date;
+    if(!state.booked.includes(key)) state.booked.push(key);
+    if(state.direction === "outward") state.outwardDate = state.date;
+    state.submitting = false;
+    go(8);
+  }catch(e){
+    state.submitting = false;
+    state.submitError = plain(e);
+    render();
+  }
+}
+
+/* ---------------- 9. Confirmed ---------------- */
+function manageLink(token){
+  return location.origin + location.pathname + "#manage=" + token;
+}
+function done(){
+  const pinned = !!state.pickupPin;
+  const pickupName = pinned ? state.pickupPin.info.text : state.pickup.n;
+  const time = pinned ? state.pickupPin.info.time : state.pickup.t;
+  const a = waitingAdvice(pinned ? {pinned: true} : state.pickup, time);
+  const bookedOutward = state.booked.some(k => k.startsWith("outward"));
+  const bookedReturn = state.booked.some(k => k.startsWith("return"));
+  const offerReturn = bookedOutward && !bookedReturn;
+  const where = state.mobile.trim() ? "a text message" : "an email";
+  const link = state.lastToken ? manageLink(state.lastToken) : "";
+
+  const messageBit = messagingLive()
+    ? '<p>We have sent ' + where + ' to <strong>' + esc(state.mobile.trim() || state.email.trim()) +
+      '</strong> with your booking and a <strong>Cancel Booking</strong> link. You do not need to keep this page.</p>'
+    : '<div class="linkbox"><b>Please save this link — it is how you cancel.</b>' +
+      '<a href="' + esc(link) + '">' + esc(link) + '</a>' +
+      '<button class="secondary" id="copylink" style="margin-top:.8rem">Copy the link</button>' +
+      '<p style="margin:.7rem 0 0;font-size:.92rem">Text messages are not switched on yet, so nothing has been sent to your phone. ' +
+      'If you lose the link you can still cancel on this page with your reference and ' +
+      (state.mobile.trim() ? 'mobile number' : 'email') + '.</p></div>';
+
+  const c = el('<div class="card">' +
+    '<div class="tick" aria-hidden="true">✓</div>' +
+    '<h2 style="text-align:center">That\'s your seat booked</h2>' +
+    '<div class="ref">' + esc(state.lastRef) + '</div>' +
+    messageBit +
+    '<div class="note"><strong>' + fmtDate(state.date) + '</strong><br>' +
+      esc(pickupName) + '<br>' + a.due + ' <strong>Be waiting by ' + esc(a.by) + '.</strong></div>' +
+    '<p>' + esc(wording("cancel_encouragement", "Plans changed? No problem! Please cancel at any time — it saves the driver waiting for you.")) + '</p>' +
+    (offerReturn
+      ? '<p>Coming home on the 704 as well? You will need a seat on that journey too.</p>' +
+        '<button class="primary" onclick="AGAIN(true)">Book my journey home</button>' +
+        '<button class="secondary" onclick="AGAIN(false)">Book another journey</button>'
+      : '<button class="primary" onclick="AGAIN(false)">Book another journey</button>') +
+    '<p class="offlist-p" style="margin-top:.9rem">Your name is filled in already. If anybody else is travelling with you ' +
+      'on that journey, please add them — we have not assumed the same party is coming.</p>' +
+    '<p style="text-align:center;margin-top:1.4rem">Having trouble? Telephone ' + phoneLink() + '</p>' +
+  '</div>');
+  const cp = c.querySelector("#copylink");
+  if(cp) cp.onclick = () => {
+    navigator.clipboard && navigator.clipboard.writeText(link).then(() => { cp.textContent = "Copied ✓"; }, () => {});
+  };
+  return c;
+}
+
+window.AGAIN = (offerReturn) => {
+  state.pairing = !!offerReturn;
+  state.direction = offerReturn ? "return" : null;
+  state.pickup = null; state.dest = null; state.pickupPin = null; state.pickupDesc = "";
+  state.mapOpen = false; state.pinTooFar = false; state.reqs = {}; state.reqOther = "";
+  state.others = []; state.party = 1; state.terms = false; state.date = null;
+  state.availability = null; state.availabilityFor = ""; state.submitError = "";
+  if(offerReturn){ state.step = 1; render(); ensureDirection(); }
+  else { state.step = 1; render(); }
+};
+
+/* =====================================================================
+   Cancelling, without needing the garage to be open
+===================================================================== */
+function cancelFind(){
+  const c = el('<div class="card">' +
+    '<h2>Cancel a booking</h2>' +
+    '<p class="lede">You can cancel at any time, right up to the bus arriving.</p>' +
+    '<div class="note"><strong>The quickest way is the Cancel Booking link</strong> in the message ' +
+      'we sent when you booked, or the one you saved. If you still have it, tap that.<br><br>No link? Fill this in instead.</div>' +
+    '<label>Your booking reference<span class="hint">Like BUS-2026-000148</span>' +
+      '<input type="text" id="cref" value="' + esc(state.cRef) + '" placeholder="BUS-2026-000148" autocomplete="off" inputmode="text"></label>' +
+    '<label>The mobile number or email you booked with' +
+      '<span class="hint">So we know it is your booking and not somebody else\'s</span>' +
+      '<input type="text" id="ccontact" value="' + esc(state.cContact) + '" placeholder="07700 900123" autocomplete="off"></label>' +
+    '<div id="cerr"></div>' +
+    '<button class="primary" id="cgo">' + (state.cBusy ? '<span class="spin"></span>Finding your booking&hellip;' : 'Cancel my booking') + '</button>' +
+    '<button class="secondary" onclick="HOME()">Back</button>' +
+    '<p style="margin-top:1.4rem" class="offlist-p">Cannot find it? Telephone ' + phoneLink() +
+      ' and we will cancel it for you when we open. If the bus is due before then, please still try — ' +
+      'we would far rather know late than not at all.</p>' +
+  '</div>');
+  const ref = c.querySelector("#cref"), con = c.querySelector("#ccontact");
+  ref.oninput = e => state.cRef = e.target.value;
+  con.oninput = e => state.cContact = e.target.value;
+  if(state.cError) c.querySelector("#cerr").appendChild(el('<div class="err">' + esc(state.cError) + '</div>'));
+  c.querySelector("#cgo").onclick = async () => {
+    if(state.cBusy) return;
+    state.cError = "";
+    const r = (state.cRef || "").trim(), k = (state.cContact || "").trim();
+    if(!r){ state.cError = "Please type your booking reference."; return render(); }
+    if(!k){ state.cError = "Please type the mobile number or email you booked with."; return render(); }
+    state.cBusy = true; render();
+    try{
+      const res = await rpc("bus_cancel_by_reference", {p_reference: r, p_contact: k, p_fingerprint: fingerprint()});
+      state.cBusy = false;
+      if(res && res.ok){
+        state.cCancelledRef = res.reference || r.toUpperCase();
+        go(10);
+      } else {
+        state.cError = ERRTEXT[(res && res.error) || "not_found"] || ERRTEXT.not_found;
+        render();
+      }
+    }catch(e){
+      state.cBusy = false; state.cError = plain(e); render();
+    }
+  };
+  return c;
+}
+
+function cancelDone(){
+  return el('<div class="card">' +
+    '<div class="tick" aria-hidden="true">✓</div>' +
+    '<h2 style="text-align:center">That booking is cancelled</h2>' +
+    '<div class="ref">' + esc(state.cCancelledRef) + '</div>' +
+    '<p><strong>Thank you for letting us know.</strong> That seat is back on sale and the driver will not be waiting for you.</p>' +
+    '<div class="note">Nothing else to do.' + (messagingLive() ? ' We have sent you a message confirming it.' : '') + '</div>' +
+    '<button class="primary" onclick="HOME()">Book another journey</button>' +
+    '<p style="text-align:center;margin-top:1.6rem">Changed your mind again? Telephone ' + phoneLink() + '</p>' +
+  '</div>');
+}
+
+window.CANCELSTART = () => { state.cError = ""; go(9); };
+window.HOME = () => {
+  state.cRef = ""; state.cContact = ""; state.cError = ""; state.cCancelledRef = "";
+  state.manage = null; state.manageError = "";
+  if(location.hash) history.replaceState(null, "", location.pathname);
+  go(0);
+};
+
+/* ---------------- The saved link: view and cancel one booking -------- */
+function manageScreen(){
+  if(state.manageError){
+    return el('<div class="card"><h2>We cannot open that link</h2>' +
+      '<p class="lede">' + esc(state.manageError) + '</p>' +
+      '<button class="primary" onclick="CANCELSTART()">Cancel with my reference instead</button>' +
+      '<button class="secondary" onclick="HOME()">Back to booking</button></div>');
+  }
+  const b = state.manage;
+  if(!b){
+    return el('<div class="card"><h2><span class="spin"></span>One moment&hellip;</h2>' +
+      '<p class="lede">Opening your booking.</p></div>');
+  }
+  const cancelled = b.status !== "confirmed";
+  const c = el('<div class="card">' +
+    '<h2>Your booking</h2>' +
+    '<div class="ref">' + esc(b.reference) + '</div>' +
+    '<dl class="summary">' +
+      '<div><dt>Day</dt><dd>' + fmtDate(b.service_date) + '</dd></div>' +
+      '<div><dt>Journey</dt><dd>' + (b.direction === "outward" ? "To Inverness" : "Home from Inverness") + '</dd></div>' +
+      '<div><dt>Name</dt><dd>' + esc(b.lead_passenger_name) + '</dd></div>' +
+      '<div><dt>Seats</dt><dd>' + esc(b.party_size) + '</dd></div>' +
+      (b.estimated_pickup_time ? '<div><dt>Be waiting by</dt><dd>' + esc(minusMinutes(String(b.estimated_pickup_time).slice(0, 5), 10)) + '</dd></div>' : '') +
+      '<div><dt>Booking</dt><dd>' + (cancelled ? "Cancelled" : "Confirmed") + '</dd></div>' +
+    '</dl>' +
+    (cancelled
+      ? '<div class="note">This booking is already cancelled. Nothing else to do.</div>'
+      : '<button class="danger" id="cxl" style="margin-top:1.3rem">' +
+          (state.manageBusy ? '<span class="spin"></span>Cancelling&hellip;' : 'Cancel this booking') + '</button>') +
+    '<button class="secondary" onclick="HOME()">Book another journey</button>' +
+    '<p style="text-align:center;margin-top:1.4rem">Having trouble? Telephone ' + phoneLink() + '</p>' +
+  '</div>');
+  const cx = c.querySelector("#cxl");
+  if(cx) cx.onclick = async () => {
+    if(state.manageBusy) return;
+    state.manageBusy = true; render();
+    try{
+      const res = await rpc("bus_cancel_booking", {p_token: state.manageToken});
+      state.manageBusy = false;
+      if(res && res.ok){ state.cCancelledRef = res.reference || b.reference; go(10); }
+      else { state.manageError = ERRTEXT[(res && res.error) || "not_found"] || ERRTEXT.not_found; render(); }
+    }catch(e){ state.manageBusy = false; state.manageError = plain(e); render(); }
+  };
+  return c;
+}
+
+async function openManage(token){
+  state.manageToken = token; state.manage = null; state.manageError = "";
+  go(11);
+  try{
+    const res = await rpc("bus_get_booking", {p_token: token});
+    if(res && res.ok){ state.manage = res; }
+    else { state.manageError = "That link did not match a booking. It may have been typed by hand, or the booking may have been removed."; }
+  }catch(e){ state.manageError = plain(e); }
+  render();
+}
+
+/* ------------------------------------------------------------------
+   The map. A real one: MapLibre over OpenStreetMap, the traced road
+   drawn on it, and the same three-band pin rule as the database.
+------------------------------------------------------------------ */
+let mapLibLoading = null;
+function loadMapLib(){
+  if(window.maplibregl) return Promise.resolve();
+  if(mapLibLoading) return mapLibLoading;
+  mapLibLoading = new Promise((resolve, reject) => {
+    const css = document.createElement("link");
+    css.rel = "stylesheet";
+    css.href = "https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/4.7.1/maplibre-gl.min.css";
+    document.head.appendChild(css);
+    const js = document.createElement("script");
+    js.src = "https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/4.7.1/maplibre-gl.min.js";
+    js.onload = resolve; js.onerror = () => reject(new Error("map_failed"));
+    document.head.appendChild(js);
+  });
+  return mapLibLoading;
+}
+
+function mountMap(slot){
+  const panel = el('<div class="maproom">' +
+    '<div class="hd">Tap anywhere along the road to show us where you will be waiting.</div>' +
+    '<div id="themap" role="application" aria-label="Map of the route. Tap to place a pin."></div>' +
+    '<div class="ft">Map © OpenStreetMap contributors. The blue line is the road the bus takes.</div>' +
+  '</div>');
+  slot.appendChild(panel);
+  if(state.pinTooFar){
+    panel.appendChild(el('<div class="pinfar" role="alert">That is more than a mile from anywhere the 704 goes. ' +
+      'Have another look at the map — or telephone ' + phoneLink() + ' and we will sort it out with you.</div>'));
+  }
+  loadMapLib().then(() => initMap(panel.querySelector("#themap")))
+    .catch(() => {
+      panel.querySelector("#themap").outerHTML =
+        '<div style="padding:1.2rem"><div class="err">The map could not load. Please choose a stop from the list, ' +
+        'or telephone ' + phone() + ' and we will arrange your pickup with you.</div></div>';
+    });
+}
+
+function initMap(container){
+  const dir = state.direction;
+  const line = routeFor(dir);
+  if(!line) return;
+  const coords = line.coords;
+  let minLng = Infinity, minLat = Infinity, maxLng = -Infinity, maxLat = -Infinity;
+  coords.forEach(c => {
+    minLng = Math.min(minLng, c[0]); maxLng = Math.max(maxLng, c[0]);
+    minLat = Math.min(minLat, c[1]); maxLat = Math.max(maxLat, c[1]);
+  });
+  const map = new maplibregl.Map({
+    container,
+    style: {
+      version: 8,
+      sources: {
+        osm: {
+          type: "raster",
+          tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
+          tileSize: 256,
+          attribution: "© OpenStreetMap contributors"
+        }
+      },
+      layers: [{id: "osm", type: "raster", source: "osm"}]
+    },
+    bounds: [[minLng, minLat], [maxLng, maxLat]],
+    fitBoundsOptions: {padding: 40},
+    attributionControl: false
+  });
+  map.addControl(new maplibregl.NavigationControl({showCompass: false}));
+  map.touchZoomRotate && map.touchZoomRotate.disableRotation();
+  map.on("load", () => {
+    map.addSource("route", {type: "geojson", data: {type: "Feature", geometry: {type: "LineString", coordinates: coords}}});
+    map.addLayer({id: "route", type: "line", source: "route",
+      paint: {"line-color": "#1f5f8b", "line-width": 4, "line-opacity": .85}});
+    const stopFeatures = DIR[dir].stops.map(s => ({
+      type: "Feature", properties: {name: s.n},
+      geometry: {type: "Point", coordinates: [s.lng, s.lat]}
+    }));
+    map.addSource("stops", {type: "geojson", data: {type: "FeatureCollection", features: stopFeatures}});
+    map.addLayer({id: "stops", type: "circle", source: "stops",
+      paint: {"circle-radius": 6, "circle-color": "#ffffff", "circle-stroke-color": "#1f5f8b", "circle-stroke-width": 2.5}});
+  });
+  let marker = null;
+  if(state.pickupPin){
+    marker = new maplibregl.Marker({color: "#a32020"}).setLngLat([state.pickupPin.lng, state.pickupPin.lat]).addTo(map);
+  }
+  map.on("click", (ev) => {
+    const p = [ev.lngLat.lng, ev.lngLat.lat];
+    placePin(dir, p, map, marker, (m) => { marker = m; });
+  });
+  container._map = map; // for the tests
+}
+
+function placePin(dir, p, map, marker, setMarker){
+  const line = routeFor(dir);
+  const hit = projectToLine(line, p);
+  const SILENT = Number(wording("pin_snap_silent_metres", "150"));
+  const NOTICE = Number(wording("pin_snap_notice_metres", "2000"));
+  if(hit.off > NOTICE){
+    state.pinTooFar = true; state.pickupPin = null; state.pickup = null;
+    render();
+    return;
+  }
+  const info = describeAlong(dir, hit.along);
+  /* On the journey home, beyond Lochcarron is set-down only. Mirror the
+     database's rule with the same words the driver would use. */
+  const cut = (CFG.service.setdown_only_after || {})[dir];
+  if(cut != null && info.order > Number(cut)){
+    state.pinTooFar = false; state.pickupPin = null; state.pickup = null;
+    render();
+    const host = document.getElementById("screens");
+    const room = host.querySelector(".maproom");
+    if(room) room.appendChild(el('<div class="pinfar" role="alert">On the journey home we can set you down beyond Lochcarron, ' +
+      'but we cannot pick you up there. Please choose a spot at Lochcarron or before it.</div>'));
+    return;
+  }
+  state.pinTooFar = false;
+  state.pickupPin = {
+    lng: hit.point[0], lat: hit.point[1],
+    offMetres: Math.round(hit.off),
+    moved: hit.off > SILENT,
+    info
+  };
+  state.pickup = {pinned: true, o: info.order, n: info.text, t: info.time};
+  render();
+}
+
+/* ------------------------------------------------------------------
+   Start up: config first, then the world.
+------------------------------------------------------------------ */
+function fatal(e){
+  const host = document.getElementById("screens");
+  host.innerHTML = "";
+  host.appendChild(el('<div class="card"><h2>We cannot load the booking page</h2>' +
+    '<p class="lede">Sorry — something went wrong loading the timetable.</p>' +
+    '<div class="note">Please try again in a few minutes, or telephone ' + phoneLink() +
+    ' and we will book your seat over the counter.</div>' +
+    '<button class="primary" onclick="location.reload()">Try again</button></div>'));
+}
+
+function maybeManageHash(){
+  const m = location.hash.match(/#manage=([a-f0-9]{64})/);
+  if(m){ openManage(m[1]); return true; }
+  return false;
+}
+window.addEventListener("hashchange", () => { maybeManageHash(); });
+
+(async function boot(){
+  try{
+    CFG = await rpc("bus_page_config", {});
+  }catch(e){ return fatal(e); }
+  if(!maybeManageHash()) go(0);
+})();
+</script>
+</body>
+</html>
