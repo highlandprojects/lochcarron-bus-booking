@@ -148,7 +148,8 @@
   .maproom .hd{background:var(--blue-wash); padding:.7rem 1rem; font-size:.9rem; color:var(--ink-soft);
                border-bottom:1px solid var(--line);}
   .maproom .ft{padding:.6rem 1rem; font-size:.85rem; color:var(--ink-soft); border-top:1px solid var(--line);}
-  #themap{height:360px; width:100%;}
+  .mapholder{height:360px; width:100%;}
+  #themap{height:100%; width:100%;}
   .linkbox{background:var(--amber-wash); border:2px solid var(--amber-line); border-radius:11px;
            padding:1rem 1.1rem; margin:1.1rem 0; font-size:.95rem;}
   .linkbox a{word-break:break-all;}
@@ -553,7 +554,10 @@ function pickDate(){
       const first = (DIR[k] && DIR[k].stops) || [];
       const b = el('<button class="choice" aria-pressed="' + (state.direction === k) + '">' +
         '<div class="top"><b>' + l + '</b></div><small>' + s + '</small></button>');
-      b.onclick = () => { state.direction = k; state.pickup = null; state.dest = null; state.date = null; ensureDirection(); };
+      b.onclick = () => {
+        state.direction = k; state.pickup = null; state.dest = null; state.date = null;
+        state.pickupPin = null; resetMap(); ensureDirection();
+      };
       dir.appendChild(b);
     });
     if(!state.direction) return c;
@@ -979,6 +983,7 @@ function done(){
 }
 
 window.AGAIN = (offerReturn) => {
+  resetMap();
   state.pairing = !!offerReturn;
   state.direction = offerReturn ? "return" : null;
   state.pickup = null; state.dest = null; state.pickupPin = null; state.pickupDesc = "";
@@ -1136,10 +1141,21 @@ function loadMapLib(){
   return mapLibLoading;
 }
 
+/* ONE map, kept alive for the whole visit.
+   -----------------------------------------------------------------
+   It used to be built afresh every time the screen redrew, which meant
+   that placing a pin threw away the view and flung you back out to the
+   whole hundred miles - having just carefully zoomed in on your own
+   road end. The map element is now held here and moved into whichever
+   panel needs it, so the zoom, the position and the pin all survive.
+   Tap again and it simply moves the pin, where you are looking. */
+let MAPEL = null, MAP = null, MAPDIR = null, MARKER = null;
+
 function mountMap(slot){
   const panel = el('<div class="maproom">' +
-    '<div class="hd">Tap anywhere along the road to show us where you will be waiting.</div>' +
-    '<div id="themap" role="application" aria-label="Map of the route. Tap to place a pin."></div>' +
+    '<div class="hd">Tap the road to show us where you will be waiting. ' +
+    'Pinch to zoom in first if you want to be exact — tap again to move the pin.</div>' +
+    '<div class="mapholder"></div>' +
     '<div class="ft">Map © OpenStreetMap contributors. The blue line is the road the bus takes.</div>' +
   '</div>');
   slot.appendChild(panel);
@@ -1147,26 +1163,30 @@ function mountMap(slot){
     panel.appendChild(el('<div class="pinfar" role="alert">That is more than a mile from anywhere the 704 goes. ' +
       'Have another look at the map — or telephone ' + phoneLink() + ' and we will sort it out with you.</div>'));
   }
-  loadMapLib().then(() => initMap(panel.querySelector("#themap")))
-    .catch(() => {
-      panel.querySelector("#themap").outerHTML =
-        '<div style="padding:1.2rem"><div class="err">The map could not load. Please choose a stop from the list, ' +
-        'or telephone ' + phone() + ' and we will arrange your pickup with you.</div></div>';
-    });
+  const holder = panel.querySelector(".mapholder");
+
+  loadMapLib().then(() => {
+    if(!MAPEL){
+      MAPEL = document.createElement("div");
+      MAPEL.id = "themap";
+      MAPEL.setAttribute("role", "application");
+      MAPEL.setAttribute("aria-label", "Map of the route. Tap to place a pin.");
+      holder.appendChild(MAPEL);
+      initMap();
+    } else {
+      holder.appendChild(MAPEL);          // the same live map, moved here
+      if(MAP){ MAP.resize(); syncMap(); }
+    }
+  }).catch(() => {
+    holder.innerHTML =
+      '<div style="padding:1.2rem"><div class="err">The map could not load. Please choose a stop from the list, ' +
+      'or telephone ' + phone() + ' and we will arrange your pickup with you.</div></div>';
+  });
 }
 
-function initMap(container){
-  const dir = state.direction;
-  const line = routeFor(dir);
-  if(!line) return;
-  const coords = line.coords;
-  let minLng = Infinity, minLat = Infinity, maxLng = -Infinity, maxLat = -Infinity;
-  coords.forEach(c => {
-    minLng = Math.min(minLng, c[0]); maxLng = Math.max(maxLng, c[0]);
-    minLat = Math.min(minLat, c[1]); maxLat = Math.max(maxLat, c[1]);
-  });
-  const map = new maplibregl.Map({
-    container,
+function initMap(){
+  MAP = new maplibregl.Map({
+    container: MAPEL,
     style: {
       version: 8,
       sources: {
@@ -1179,43 +1199,75 @@ function initMap(container){
       },
       layers: [{id: "osm", type: "raster", source: "osm"}]
     },
-    bounds: [[minLng, minLat], [maxLng, maxLat]],
-    fitBoundsOptions: {padding: 40},
+    center: [-5.0, 57.5], zoom: 7,
     attributionControl: false
   });
-  map.addControl(new maplibregl.NavigationControl({showCompass: false}));
-  map.touchZoomRotate && map.touchZoomRotate.disableRotation();
-  map.on("load", () => {
-    map.addSource("route", {type: "geojson", data: {type: "Feature", geometry: {type: "LineString", coordinates: coords}}});
-    map.addLayer({id: "route", type: "line", source: "route",
+  MAP.addControl(new maplibregl.NavigationControl({showCompass: false}));
+  MAP.touchZoomRotate && MAP.touchZoomRotate.disableRotation();
+
+  MAP.on("load", () => {
+    MAP.addSource("route", {type: "geojson", data: {type:"FeatureCollection", features: []}});
+    MAP.addLayer({id: "route", type: "line", source: "route",
       paint: {"line-color": "#1f5f8b", "line-width": 4, "line-opacity": .85}});
-    const stopFeatures = DIR[dir].stops.map(s => ({
-      type: "Feature", properties: {name: s.n},
-      geometry: {type: "Point", coordinates: [s.lng, s.lat]}
-    }));
-    map.addSource("stops", {type: "geojson", data: {type: "FeatureCollection", features: stopFeatures}});
-    map.addLayer({id: "stops", type: "circle", source: "stops",
-      paint: {"circle-radius": 6, "circle-color": "#ffffff", "circle-stroke-color": "#1f5f8b", "circle-stroke-width": 2.5}});
+    MAP.addSource("stops", {type: "geojson", data: {type:"FeatureCollection", features: []}});
+    MAP.addLayer({id: "stops", type: "circle", source: "stops",
+      paint: {"circle-radius": 6, "circle-color": "#ffffff",
+              "circle-stroke-color": "#1f5f8b", "circle-stroke-width": 2.5}});
+    syncMap(true);
   });
-  let marker = null;
-  if(state.pickupPin){
-    marker = new maplibregl.Marker({color: "#a32020"}).setLngLat([state.pickupPin.lng, state.pickupPin.lat]).addTo(map);
-  }
-  map.on("click", (ev) => {
-    const p = [ev.lngLat.lng, ev.lngLat.lat];
-    placePin(dir, p, map, marker, (m) => { marker = m; });
-  });
-  container._map = map; // for the tests
+
+  /* Always read the direction at the moment of the tap, never a captured
+     copy — the same map serves the journey out and the journey home. */
+  MAP.on("click", ev => placePin(state.direction, [ev.lngLat.lng, ev.lngLat.lat]));
+
+  MAPEL._map = MAP;   // for the tests
 }
 
-function placePin(dir, p, map, marker, setMarker){
+/* Bring the map into line with the state, without disturbing the view. */
+function syncMap(force){
+  if(!MAP || !MAP.getSource || !MAP.getSource("route")) return;
+  const dir = state.direction;
+  const line = routeFor(dir);
+  if(!line) return;
+
+  const changed = force || MAPDIR !== dir;
+  if(changed){
+    MAP.getSource("route").setData(
+      {type: "Feature", geometry: {type: "LineString", coordinates: line.coords}});
+    MAP.getSource("stops").setData({type: "FeatureCollection",
+      features: (DIR[dir] ? DIR[dir].stops : []).map(s => ({
+        type: "Feature", properties: {name: s.n},
+        geometry: {type: "Point", coordinates: [s.lng, s.lat]}}))});
+    /* Only a NEW journey re-frames the map. Placing a pin never does. */
+    const b = new maplibregl.LngLatBounds();
+    line.coords.forEach(c => b.extend(c));
+    MAP.fitBounds(b, {padding: 40, duration: 0});
+    MAPDIR = dir;
+  }
+
+  if(state.pickupPin){
+    const at = [state.pickupPin.lng, state.pickupPin.lat];
+    if(MARKER) MARKER.setLngLat(at);
+    else MARKER = new maplibregl.Marker({color: "#a32020"}).setLngLat(at).addTo(MAP);
+  } else if(MARKER){
+    MARKER.remove(); MARKER = null;
+  }
+}
+
+/* Starting a fresh journey should give a fresh map. */
+function resetMap(){
+  if(MARKER){ MARKER.remove(); MARKER = null; }
+  MAPDIR = null;
+}
+
+function placePin(dir, p){
   const line = routeFor(dir);
   const hit = projectToLine(line, p);
   const SILENT = Number(wording("pin_snap_silent_metres", "150"));
   const NOTICE = Number(wording("pin_snap_notice_metres", "2000"));
   if(hit.off > NOTICE){
     state.pinTooFar = true; state.pickupPin = null; state.pickup = null;
-    render();
+    render(); syncMap();
     return;
   }
   const info = describeAlong(dir, hit.along);
@@ -1226,7 +1278,7 @@ function placePin(dir, p, map, marker, setMarker){
   if(zone){
     state.pinTooFar = false; state.pickupPin = null; state.pickup = null;
     state.zoneBlocked = zone;
-    render();
+    render(); syncMap();
     return;
   }
   state.zoneBlocked = null;
@@ -1236,7 +1288,7 @@ function placePin(dir, p, map, marker, setMarker){
   const cut = (CFG.service.setdown_only_after || {})[dir];
   if(cut != null && info.order > Number(cut)){
     state.pinTooFar = false; state.pickupPin = null; state.pickup = null;
-    render();
+    render(); syncMap();
     const host = document.getElementById("screens");
     const room = host.querySelector(".maproom");
     if(room) room.appendChild(el('<div class="pinfar" role="alert">On the journey home we can set you down beyond Lochcarron, ' +
@@ -1252,6 +1304,7 @@ function placePin(dir, p, map, marker, setMarker){
   };
   state.pickup = {pinned: true, o: info.order, n: info.text, t: info.time};
   render();
+  syncMap();          /* move the pin where they are looking; do not re-frame */
 }
 
 /* ------------------------------------------------------------------
