@@ -58,6 +58,8 @@
   .primary:disabled{background:#9fb4c2; cursor:not-allowed;}
   .secondary{background:var(--paper); color:var(--blue); border-color:var(--line); margin-top:.7rem;}
   .secondary:hover{border-color:var(--blue);}
+  .linkbtn{display:flex; align-items:center; justify-content:center;
+           text-decoration:none; margin-top:.7rem;}
   .danger{background:var(--paper); color:var(--red); border-color:#e2b4b4;}
   :focus-visible{outline:4px solid var(--focus); outline-offset:2px;}
 
@@ -179,6 +181,7 @@
 </main>
 
 <footer>
+  <p style="margin:0 0 .8rem"><a href="route.html">The route, the stops and the times</a></p>
   Lochcarron Garage, Lochcarron, Ross-shire IV54 8YS<br>
   Telephone <a class="tel" href="tel:01520722997">01520 722997</a>
 </footer>
@@ -534,6 +537,7 @@ function start(){
     '</div>' +
     '<button class="primary" onclick="START()">Book the Bus</button>' +
     '<button class="secondary" onclick="CANCELSTART()">Cancel a booking</button>' +
+    '<a class="btn secondary linkbtn" href="route.html">See the route and all the stops</a>' +
   '</div>');
 }
 window.START = () => next();

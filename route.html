@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Service 704 — route check</title>
+<title>Service 704 — the route and the stops</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/4.7.1/maplibre-gl.min.css">
 <style>
   :root{
@@ -36,6 +36,9 @@
   .tag.tt{background:var(--blue-wash);color:var(--blue)}
   .note{background:var(--amber-wash);border-left:5px solid var(--amber-line);
         padding:.8rem 1rem;border-radius:0 8px 8px 0;margin:1rem 0;font-size:.92rem}
+  .bookbtn{flex:1 1 auto;min-height:48px;display:flex;align-items:center;justify-content:center;
+           font-weight:600;text-decoration:none;border-radius:10px;
+           background:var(--blue);color:#fff;padding:.5rem 1rem}
   .maplibregl-popup-content{font:inherit;font-size:.9rem;padding:.6rem .8rem}
   footer{padding:1.5rem 1rem 3rem;text-align:center;color:var(--ink-soft);font-size:.85rem}
 </style>
@@ -43,9 +46,13 @@
 <body>
 
 <header>
-  <h1>Service 704 — route check</h1>
-  <p>Every stop and the road the bus takes, straight from the live system.</p>
+  <h1>Service 704 — the route and the stops</h1>
+  <p>Applecross and Lochcarron to Inverness · every stop, in the order the bus meets them.</p>
 </header>
+
+<div class="bar" style="border-bottom:none;padding-bottom:0">
+  <a class="bookbtn" href="./">← Book a seat</a>
+</div>
 
 <div class="bar">
   <button id="btn-out" aria-pressed="true">Lochcarron → Inverness</button>
@@ -67,7 +74,11 @@
   </p>
 </div>
 
-<footer>Lochcarron Garage · Service 704 · this page reads the live booking system, so it is always current.</footer>
+<div class="wrap" style="padding-top:0">
+  <a class="bookbtn" href="./" style="max-width:320px;margin:0 auto">Book a seat on this bus</a>
+</div>
+<footer>Lochcarron Garage · Service 704 · telephone 01520&nbsp;722997<br>
+This page reads the live booking system, so it is always current.</footer>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/4.7.1/maplibre-gl.min.js"></script>
 <script>
@@ -118,9 +129,10 @@ function draw(){
 
   const miles = gj && gj.properties && (gj.properties.distance_miles_as_routed || gj.properties.distance_miles);
   document.getElementById("summary").innerHTML =
-    "<strong>" + stops.length + " stops</strong>, " +
-    (miles ? ("about " + miles + " miles of road drawn. ") : "") +
-    "If a pin is in the wrong place, say which one and where it should be.";
+    "<strong>" + stops.length + " stops</strong>" +
+    (miles ? (", about " + miles + " miles.") : ".") +
+    " Times are when the bus is due &mdash; please be waiting about ten minutes before, " +
+    "as on a single-track road it can run early as easily as late.";
 
   const rows = stops.map((s,i)=>
     '<tr><td><span class="num'+(s.official?"":" local")+'">'+(i+1)+'</span></td>'+
