@@ -234,6 +234,12 @@ const ERRTEXT = {
 };
 function plain(err){
   const code = (err && err.code) || String(err && err.message || err);
+  /* The database names the village in the error, e.g. choose_a_stop_in_lochcarron. */
+  if(/^choose_a_stop_in/.test(code)){
+    const v = code.replace(/^choose_a_stop_in_?/, "").replace(/_/g, " ").trim();
+    return "In " + (v ? (v.charAt(0).toUpperCase() + v.slice(1)) : "the village") +
+      " the bus uses its stops, so please go back and choose one from the list.";
+  }
   return ERRTEXT[code] ||
     "Something went wrong and your booking has NOT been made. Please try again, or telephone the garage on 01520 722997.";
 }
@@ -382,6 +388,23 @@ function projectToLine(line, p){
   return best;
 }
 
+/* Village zones. Inside one, the bus uses its stops and a free pin is not
+   offered - the database refuses it too, so this is the page saying so
+   politely rather than the page being the only guard. */
+function zoneAt(lat, lng){
+  let best = null;
+  ((CFG && CFG.zones) || []).forEach(z => {
+    if(String(z.rule) === "custom_allowed") return;
+    const d = havM([lng, lat], [Number(z.lng), Number(z.lat)]);
+    if(d <= Number(z.radius_m) && (!best || Number(z.radius_m) < Number(best.radius_m))) best = z;
+  });
+  return best;
+}
+function stopsInZone(dir, z){
+  return (DIR[dir] ? DIR[dir].stops : []).filter(s =>
+    havM([Number(z.lng), Number(z.lat)], [s.lng, s.lat]) <= Number(z.radius_m));
+}
+
 /* A pin's position, in a driver's terms. Only official and approved
    stops with a position in this direction take part. */
 function describeAlong(dir, along){
@@ -449,7 +472,7 @@ const state = {
   pickup: null, pickupPin: null, pickupDesc: "",
   dest: null, party: 1, lead: "", others: [],
   reqs: {}, reqOther: "", mobile: "", email: "", landline: "", area: "", terms: false, hp: "",
-  mapOpen: false, pinTooFar: false,
+  mapOpen: false, pinTooFar: false, zoneBlocked: null,
   availability: null, availabilityFor: "",
   booked: [], lastRef: "", lastToken: "", outwardDate: null, pairing: false,
   submitting: false, submitError: "",
@@ -607,10 +630,35 @@ function pickPickup(){
   });
 
   const om = c.querySelector("#openmap");
-  if(om) om.onclick = () => { state.mapOpen = true; state.pickup = null; state.pinTooFar = false; render(); };
+  if(om) om.onclick = () => {
+    state.mapOpen = true; state.pickup = null; state.pinTooFar = false; state.zoneBlocked = null; render();
+  };
   if(state.mapOpen && mapEnabled()){
     const slot = el('<div></div>');
     c.querySelector(".offlist").appendChild(slot);
+    /* Tapped in a village: the stops there, offered directly. */
+    if(state.zoneBlocked){
+      const z = state.zoneBlocked;
+      const near = stopsInZone(state.direction, z).filter(s => !s.setdownOnly);
+      const box = el('<div class="pinfar" role="alert" style="margin-bottom:1rem">' +
+        '<strong>' + esc(z.name) + '</strong> — ' +
+        esc(wording("village_zone_wording",
+          "In the villages the bus uses its stops, so please choose one from the list rather than a spot on the map. Out on the open road you can pin anywhere.")) +
+        '</div>');
+      slot.appendChild(box);
+      const list = el('<div style="margin-bottom:1rem"></div>');
+      near.forEach(s => {
+        const b = el('<button class="choice">' +
+          '<div class="top"><b>' + esc(s.n) + '</b><span>' + esc(s.t || "") + '</span></div>' +
+          (s.local ? '<small>Local pickup point</small>' : '') + '</button>');
+        b.onclick = () => {
+          state.pickup = s; state.pickupPin = null; state.pickupDesc = "";
+          state.zoneBlocked = null; state.pinTooFar = false; state.availability = null; render();
+        };
+        list.appendChild(b);
+      });
+      slot.appendChild(list);
+    }
     mountMap(slot);
   }
   return c;
@@ -1171,6 +1219,18 @@ function placePin(dir, p, map, marker, setMarker){
     return;
   }
   const info = describeAlong(dir, hit.along);
+
+  /* In a village, the answer is a stop, not a pin. Say so and offer the
+     stops there rather than making them find them. */
+  const zone = zoneAt(hit.point[1], hit.point[0]);
+  if(zone){
+    state.pinTooFar = false; state.pickupPin = null; state.pickup = null;
+    state.zoneBlocked = zone;
+    render();
+    return;
+  }
+  state.zoneBlocked = null;
+
   /* On the journey home, beyond Lochcarron is set-down only. Mirror the
      database's rule with the same words the driver would use. */
   const cut = (CFG.service.setdown_only_after || {})[dir];
