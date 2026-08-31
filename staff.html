@@ -427,7 +427,9 @@ const take = {
   note: "",
   override: false, overrideReason: "",
   ackNoMessages: false, ackNeeded: false,
-  busy: false, error: null, done: null
+  busy: false, error: null, done: null,
+  /* Set only when this booking is the journey home of one just taken. */
+  homeBusy: false, homeFrom: null, linkTo: null
 };
 
 /* Bicycles are deliberately absent. The database refuses them (migration
@@ -1048,11 +1050,34 @@ function renderTake(){
           'nothing has been sent to them either way. Until they are, treat every booking as one ' +
           'somebody may have to ring.</div>') +
       (d.is_override ? '<div class="note">This one used seat 13 or 14.</div>' : '') +
-      '<button class="btn wide" id="another">Take another booking</button>' +
+
+      /* THE THING THE CALLER IS ABOUT TO ASK FOR ANYWAY. Almost nobody on
+         this route travels one way: Inverness is a day out, and somebody
+         booking the morning is booking the afternoon in the same breath.
+         Making the office type it all again is not merely slow - it is
+         where the mistakes come from. A name spelt differently the second
+         time makes two customers out of one woman, and the walking frame
+         gets left off the run that most needs the driver to wait. */
+      (take.direction === "outward"
+        ? '<button class="btn wide" id="gohome">Now book their journey home</button>' +
+          '<p class="muted">Everything is carried over from ' + esc(d.reference) +
+          ' — you only untick anybody who is not coming back.</p>' +
+          '<p></p>'
+        : '') +
+
+      '<button class="btn ' + (take.direction === "outward" ? "secondary " : "") +
+        'wide" id="another">Take another booking</button>' +
       '<p></p><button class="btn secondary wide" id="seeday">See that day</button>' +
       '</div>';
     el("another").onclick = () => { resetTake(); render(); };
     el("seeday").onclick = () => { day.date = take.date; TAB = "day"; resetTake(); loadDay(); };
+    if(el("gohome")) el("gohome").onclick = () => goHome(d.booking_id);
+    return;
+  }
+
+  if(take.homeBusy){
+    M().innerHTML = '<div class="card"><h2>The journey home</h2>' +
+      '<p class="muted">Fetching what they told you this morning…</p></div>';
     return;
   }
 
@@ -1061,7 +1086,35 @@ function renderTake(){
   const pickOrder = take.pin ? take.pin.order : (pickStop ? pickStop.o : null);
 
   let html = '<div class="card">' +
-    '<h2>Take a booking over the telephone</h2>' +
+    '<h2>' + (take.homeFrom ? 'Their journey home' : 'Take a booking over the telephone') + '</h2>' +
+
+    /* Everything below is already filled in from the morning's booking.
+       Saying so plainly matters: a form that arrives full and does not
+       explain itself gets read as a mistake, and the office starts
+       clearing boxes that were right. */
+    (take.homeFrom
+      ? '<div class="good">Everything is carried over from <strong>' +
+          esc(take.homeFrom.reference) + '</strong>. Check who is actually coming back — ' +
+          'take out anybody who is not — and press the button.</div>' +
+        (take.homeFrom.note
+          /* SHOWN, not copied. "Green gate past the bridge" is about this
+             morning's pick-up and means nothing outside Inverness bus
+             station at five o'clock. The office reads it and decides. */
+          ? '<div class="note"><strong>What they told you this morning:</strong> ' +
+            esc(take.homeFrom.note) +
+            '<br><span class="hint">Not carried over — it may have been about the ' +
+            'pick-up this morning. Type it below if it still applies.</span></div>'
+          : '') +
+        (take.homeFrom.stopsKnown
+          ? ''
+          : '<div class="note">' + esc(take.homeFrom.reason ||
+              'One of those places has no position on the journey home.') +
+            ' Choose where they get on and off below.</div>') +
+        (take.homeFrom.setdown
+          ? '<div class="note">Coming home, the bus can only set people down past ' +
+            'Lochcarron — it cannot pick up there. Check where she is actually getting on.</div>'
+          : '')
+      : '') +
 
     '<label for="td">Which day</label>' +
     dayPicker("td", take.date) +
@@ -1359,6 +1412,9 @@ async function doTake(){
     override_reason: take.override ? take.overrideReason.trim() : null,
     confirm_no_notification: take.ackNoMessages
   };
+  /* Joins the two halves of the day to each other, so a stand-down or a
+     cancellation on one is visible from the other. */
+  if(take.linkTo) payload.link_to = take.linkTo;
   if(take.pin){
     payload.pickup_latitude = take.pin.lat;
     payload.pickup_longitude = take.pin.lng;
@@ -1390,6 +1446,80 @@ async function doTake(){
   function fail(m){ take.error = m; render(); }
 }
 
+/* ---------------------- The journey home ----------------------
+   The machinery for this was written on 29 July and has its own database
+   test. Until today nothing had ever called it: there was no public
+   wrapper and no button, so it sat finished behind a wall. This is the
+   button.
+
+   It fills the form in and stops. It does NOT book anything, because the
+   party coming home is very often not the party that went out - somebody
+   stays on for tea, somebody gets a lift - and a booking made on an
+   assumption is a seat held for a person who never appears. */
+async function goHome(bookingId){
+  take.homeBusy = true; render();
+  let s;
+  try{
+    s = await rpc("bus_staff_suggest_return", {p_booking_id: bookingId});
+  }catch(e){
+    take.homeBusy = false; take.error = say(e); render(); return;
+  }
+  take.homeBusy = false;
+
+  if(!s || s.ok === false){
+    take.error = say({code: (s && s.reason) || "unknown"}, "carried over");
+    render(); return;
+  }
+
+  const dayBefore = take.date;
+  resetTake();
+  take.date      = s.service_date || dayBefore;
+  take.direction = "return";
+
+  /* The SAME customer, by id. Without this the office types the number in
+     again and one woman quietly becomes two customer records, which then
+     breaks "have we got a number for her?" for ever afterwards. */
+  take.customer = s.customer_id
+    ? {customer_id: s.customer_id, display_name: s.lead_passenger_name,
+       contacts: [s.mobile, s.landline, s.email].filter(Boolean).join(" / "),
+       home_area: s.home_area || ""}
+    : null;
+  take.newName  = s.lead_passenger_name || "";
+  take.homeArea = s.home_area || "";
+  take.mobile   = s.mobile   || "";
+  take.landline = s.landline || "";
+  take.email    = s.email    || "";
+  take.party    = Number(s.party_size) || 1;
+  take.otherPassengers = (s.passengers || []).join("\n");
+
+  /* The requirements come too. This is the walking frame, and it is the
+     reason "nearly pre-populated" was not good enough: the run that most
+     needs the driver to wait at the step is the one at the end of the
+     day, when everybody is tired and nobody retypes anything. */
+  take.reqs = {};
+  (s.requirements || []).forEach(r => { if(r && r.type) take.reqs[r.type] = true; });
+
+  /* The note is SHOWN, never copied. "Green gate past the bridge" is
+     about this morning's pick-up; at five o'clock she is standing outside
+     Inverness bus station and there is no gate. The office reads it and
+     decides. */
+  take.homeFrom = {
+    reference: s.outward_reference || "",
+    note: s.note_from_the_outward_journey || "",
+    stopsKnown: s.stops_known !== false,
+    reason: s.reason || "",
+    setdown: !!s.boarding_in_setdown_section
+  };
+  take.linkTo = s.linked_booking_id || bookingId;
+
+  await loadDirection("return");
+  if(s.stops_known !== false){
+    take.pickupId = s.pickup_point_id || "";
+    take.destId   = s.destination_point_id || "";
+  }
+  render();
+}
+
 function resetTake(){
   const d = take.date, dir = take.direction;
   Object.assign(take, {
@@ -1397,7 +1527,10 @@ function resetTake(){
     newName: "", homeArea: "", mobile: "", landline: "", email: "", party: 1,
     pickupId: "", destId: "", pin: null, pinMode: false, reqs: {}, otherPassengers: "",
     note: "", override: false, overrideReason: "",
-    ackNoMessages: false, ackNeeded: false, busy: false, error: null, done: null
+    ackNoMessages: false, ackNeeded: false, busy: false, error: null, done: null,
+    /* Cleared deliberately. A linkTo left behind from an earlier booking
+       would join this journey home to the wrong passenger's morning. */
+    homeBusy: false, homeFrom: null, linkTo: null
   });
 }
 
