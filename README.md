@@ -7,6 +7,7 @@ Three pages, all static, all reading the live database directly.
 | `index.html` | The public booking page. |
 | `route.html` | The route and every stop, both directions. Linked from the booking page. |
 | `staff.html` | **The office.** Taking bookings over the telephone, the day, the call list. Sign-in required — it is deliberately not linked from the public page. |
+| `driver.html` | **The driver.** The run in road order, tap people on, walk-ons, end of run. Works with no signal: taps are kept in the phone and send themselves. Sign-in required, and likewise unlinked. |
 
 The pages are built and tested in the main project repository
 (`web/book/`, tested by `web/test/run.sh` against a real PostgreSQL with

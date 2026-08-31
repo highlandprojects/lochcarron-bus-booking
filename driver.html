@@ -1,0 +1,692 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#164a6d">
+<title>Service 704 — the driver</title>
+<style>
+  :root{
+    --ink:#121c25; --ink-soft:#4a6272; --line:#c2d0d9; --paper:#fff; --wash:#eaf0f4;
+    --blue:#1f5f8b; --blue-dark:#164a6d; --blue-wash:#e6f0f7;
+    --green:#16663f; --green-wash:#e2f1e9;
+    --red:#9c2018; --red-wash:#fbeae8;
+    --amber:#a86c00; --amber-wash:#fdf2df;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:rgba(31,95,139,.15)}
+  html{-webkit-text-size-adjust:100%}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
+       color:var(--ink);background:var(--wash);font-size:18px;line-height:1.45}
+  header{background:var(--blue-dark);color:#fff;padding:.7rem .9rem;
+         padding-top:calc(.7rem + env(safe-area-inset-top));
+         display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;position:sticky;top:0;z-index:10}
+  header h1{margin:0;font-size:1rem;font-weight:600;flex:1 1 auto}
+  header button{font:inherit;font-size:.85rem;background:rgba(255,255,255,.16);color:#fff;
+                border:1px solid rgba(255,255,255,.45);border-radius:8px;padding:.35rem .8rem;cursor:pointer}
+  .banner{padding:.6rem .9rem;font-size:.95rem;font-weight:600;text-align:center}
+  .banner.off{background:var(--amber-wash);color:#7a4f00;border-bottom:2px solid var(--amber)}
+  .banner.queued{background:var(--blue-wash);color:var(--blue-dark);border-bottom:2px solid var(--blue)}
+  main{max-width:760px;margin:0 auto;padding:.8rem;
+       padding-bottom:calc(4rem + env(safe-area-inset-bottom))}
+  .card{background:var(--paper);border:1px solid var(--line);border-radius:14px;
+        padding:.9rem;margin-bottom:.8rem}
+  h2{margin:0 0 .5rem;font-size:1.05rem;color:var(--blue-dark)}
+  label{display:block;font-weight:600;font-size:.95rem;margin:.7rem 0 .25rem}
+  input,select{font:inherit;width:100%;padding:.7rem;border:2px solid var(--line);
+               border-radius:10px;min-height:52px;background:var(--paper);color:var(--ink)}
+  .btn{font:inherit;font-weight:700;min-height:56px;border-radius:12px;cursor:pointer;
+       border:2px solid var(--blue);background:var(--blue);color:#fff;padding:.5rem 1rem;
+       display:inline-flex;align-items:center;justify-content:center;gap:.4rem;width:100%}
+  .btn.secondary{background:var(--paper);color:var(--blue)}
+  .btn.ghost{background:transparent;border-color:var(--line);color:var(--ink-soft);
+             min-height:44px;font-weight:600;font-size:.9rem}
+  .btn[disabled]{opacity:.45}
+  .daybtn{display:flex;align-items:center;justify-content:space-between;gap:.6rem;
+          width:100%;text-align:left;font:inherit;background:var(--paper);
+          border:2px solid var(--line);border-radius:12px;padding:.8rem;margin-bottom:.5rem;
+          min-height:64px;cursor:pointer}
+  .daybtn strong{font-size:1.1rem}
+  .daybtn .n{font-size:1.5rem;font-weight:800;color:var(--blue)}
+  .daybtn.today{border-color:var(--blue)}
+  .daybtn.down{background:var(--red-wash);border-color:var(--red)}
+  .pick{display:flex;gap:.5rem;margin:.6rem 0}
+  .pick button{flex:1;min-height:60px;font:inherit;font-size:1rem;font-weight:700;cursor:pointer;
+               border:2px solid var(--line);background:var(--paper);color:var(--blue);border-radius:12px}
+  .pick button[aria-pressed="true"]{background:var(--blue);color:#fff;border-color:var(--blue)}
+  .pax{background:var(--paper);border:2px solid var(--line);border-radius:14px;
+       padding:.85rem;margin-bottom:.7rem}
+  .pax.on{border-color:var(--green);background:var(--green-wash)}
+  .pax.off{border-color:var(--red);background:var(--red-wash)}
+  .pax .stop{font-size:1.25rem;font-weight:800;color:var(--blue-dark);line-height:1.2}
+  .pax .time{float:right;font-size:1.25rem;font-weight:800;color:var(--blue-dark)}
+  .pax .name{font-size:1.15rem;font-weight:700;margin-top:.15rem}
+  .pax .sub{font-size:.92rem;color:var(--ink-soft)}
+  .pax .flags{display:flex;gap:.35rem;flex-wrap:wrap;margin:.4rem 0 0}
+  .flag{font-size:.8rem;font-weight:700;padding:.15rem .55rem;border-radius:20px;
+        background:var(--blue-wash);color:var(--blue-dark)}
+  .flag.warn{background:var(--amber-wash);color:var(--amber)}
+  .flag.bad{background:var(--red-wash);color:var(--red)}
+  .pax .acts{display:flex;gap:.5rem;margin-top:.6rem}
+  .pax .acts button{flex:1;min-height:56px;font:inherit;font-size:1rem;font-weight:700;
+                    border-radius:12px;cursor:pointer;border:2px solid var(--line);
+                    background:var(--paper);color:var(--ink)}
+  .pax .acts button.yes[aria-pressed="true"]{background:var(--green);color:#fff;border-color:var(--green)}
+  .pax .acts button.no[aria-pressed="true"]{background:var(--red);color:#fff;border-color:var(--red)}
+  .tel{display:inline-block;font-weight:700;color:var(--blue);text-decoration:none;
+       padding:.15rem 0}
+  .note{background:var(--amber-wash);border-left:5px solid var(--amber);padding:.6rem .8rem;
+        border-radius:0 8px 8px 0;margin:.6rem 0;font-size:.95rem}
+  .bad{background:var(--red-wash);border-left:5px solid var(--red);padding:.6rem .8rem;
+       border-radius:0 8px 8px 0;margin:.6rem 0}
+  .good{background:var(--green-wash);border-left:5px solid var(--green);padding:.6rem .8rem;
+        border-radius:0 8px 8px 0;margin:.6rem 0}
+  .muted{color:var(--ink-soft);font-size:.9rem}
+  .stick{position:fixed;left:0;right:0;bottom:0;padding:.6rem .8rem;
+         padding-bottom:calc(.6rem + env(safe-area-inset-bottom));
+         background:rgba(255,255,255,.96);border-top:1px solid var(--line);
+         display:flex;gap:.5rem;max-width:760px;margin:0 auto}
+  .stick .btn{min-height:52px}
+  .hidden{display:none !important}
+</style>
+</head>
+<body>
+
+<header>
+  <h1 id="title">Service 704 — the driver</h1>
+  <button id="back" class="hidden">Back</button>
+  <button id="signout" class="hidden">Sign out</button>
+</header>
+<div id="banner"></div>
+<main id="main"><div class="card">Loading…</div></main>
+
+<script>
+"use strict";
+/* =====================================================================
+   The driver's screen.
+
+   Written for a phone held in one hand at a road end, and for the fact
+   that this route has no signal for miles at a time. Three consequences,
+   and everything else follows from them:
+
+   1. IT MUST WORK WITH NO SIGNAL. The day's sheet is kept in the phone
+      the moment it is fetched. Every tap is written to a queue in the
+      phone FIRST and sent afterwards, so a tap never depends on there
+      being a bar. Nothing is ever lost by driving into a glen.
+
+   2. A TAP MUST NEVER PUNISH THE DRIVER. Tapping twice is harmless.
+      Tapping the wrong one is undoable. If the driver taps nothing all
+      day he has used the system correctly - the taps are evidence for
+      the Council return, not a duty.
+
+   3. IT MUST SAY HOW OLD IT IS. A sheet fetched three hours ago may not
+      know about a cancellation. The screen says so rather than looking
+      confident.
+===================================================================== */
+
+const SUPABASE_URL = "https://sswidsjglvpbbthsqwdy.supabase.co";
+const ANON_KEY = "sb_publishable_HYylK1k8WEtN3RC56zXNXA_ViLb3Zuw";
+const K = {
+  session: "bus704.driver.session",
+  queue:   "bus704.driver.queue",
+  sheet:   "bus704.driver.sheet",
+  days:    "bus704.driver.days"
+};
+
+/* ------------------------------------------------------------------
+   The phone's own memory. Wrapped, because a browser in private mode
+   throws rather than returning nothing, and losing the screen to that
+   would be absurd.
+------------------------------------------------------------------ */
+function keep(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(_){} }
+function recall(k, d){
+  try{ const s = localStorage.getItem(k); return s ? JSON.parse(s) : d; }catch(_){ return d; }
+}
+function forget(k){ try{ localStorage.removeItem(k); }catch(_){} }
+
+let SESSION = recall(K.session, null);
+let ME = null;
+let ONLINE = navigator.onLine !== false;
+let QUEUE = recall(K.queue, []);
+let flushing = false;
+
+/* ------------------------------------------------------------------
+   Talking to the database
+------------------------------------------------------------------ */
+async function authPost(grant, body){
+  const r = await fetch(SUPABASE_URL + "/auth/v1/token?grant_type=" + grant, {
+    method: "POST", headers: {apikey: ANON_KEY, "Content-Type": "application/json"},
+    body: JSON.stringify(body)
+  });
+  const j = await r.json().catch(() => ({}));
+  if(!r.ok) throw new Error(j.error_description || j.msg || j.error || "sign_in_failed");
+  return {access_token: j.access_token, refresh_token: j.refresh_token,
+          expires_at: Date.now() + ((j.expires_in || 3600) - 60) * 1000};
+}
+function setSession(s){
+  SESSION = s;
+  if(s) keep(K.session, s); else forget(K.session);
+}
+async function token(){
+  if(!SESSION) throw new Error("not_signed_in");
+  if(SESSION.expires_at && Date.now() > SESSION.expires_at){
+    setSession(await authPost("refresh_token", {refresh_token: SESSION.refresh_token}));
+  }
+  return SESSION.access_token;
+}
+async function rpc(fn, args){
+  const t = await token();
+  const r = await fetch(SUPABASE_URL + "/rest/v1/rpc/" + fn, {
+    method: "POST",
+    headers: {apikey: ANON_KEY, Authorization: "Bearer " + t, "Content-Type": "application/json"},
+    body: JSON.stringify(args || {})
+  });
+  if(r.status === 401){ setSession(null); ME = null; throw new Error("your_sign_in_has_run_out"); }
+  const text = await r.text();
+  let body = null; try{ body = text ? JSON.parse(text) : null; }catch(_){}
+  if(!r.ok){
+    const e = new Error((body && body.message) || text || "request_failed");
+    e.code = body && body.message ? String(body.message) : "";
+    throw e;
+  }
+  return body;
+}
+
+const SAY = {
+  not_permitted: "Your account is not allowed to record anything. Ring the office.",
+  booking_not_found: "That booking is not on this sheet any more. Pull the sheet down again when you have signal.",
+  unknown_event: "Something is wrong with this screen — tell whoever set it up.",
+  your_sign_in_has_run_out: "Your sign-in has run out. Sign in again when you have signal.",
+  not_signed_in: "Please sign in."
+};
+function say(e){
+  const c = (e && e.code) || String((e && e.message) || e);
+  return SAY[c] || c;
+}
+
+/* ------------------------------------------------------------------
+   The queue. THIS is the offline story, and it is deliberately dull.
+
+   Every tap is appended here and rendered immediately. A separate loop
+   sends them. Each entry remembers WHEN THE DRIVER TAPPED, which is what
+   goes into the database as occurred_at - so a tap made at Shieldaig and
+   sent at Garve is recorded as having happened at Shieldaig.
+------------------------------------------------------------------ */
+function enqueue(fn, args){
+  QUEUE.push({id: Date.now() + "-" + Math.random().toString(36).slice(2, 7),
+              fn, args, at: new Date().toISOString(), tries: 0});
+  keep(K.queue, QUEUE);
+  flush();
+}
+async function flush(){
+  if(flushing || !QUEUE.length || !SESSION) return;
+  if(navigator.onLine === false){ ONLINE = false; render(); return; }
+  flushing = true;
+  while(QUEUE.length){
+    const item = QUEUE[0];
+    try{
+      await rpc(item.fn, item.args);
+      QUEUE.shift();
+      keep(K.queue, QUEUE);
+      ONLINE = true;
+    }catch(e){
+      const code = (e && e.code) || "";
+      /* A refusal from the database is final - retrying it forever would
+         block everything behind it. Anything else is the road, not the
+         request, so it waits. */
+      if(code && !/Failed to fetch|NetworkError|load failed/i.test(String(e.message))){
+        item.tries++;
+        if(item.tries >= 3){
+          QUEUE.shift();
+          keep(K.queue, QUEUE);
+          item.rejected = say(e);
+          REJECTED.push(item);
+        }else{
+          keep(K.queue, QUEUE);
+        }
+      }else{
+        ONLINE = false;
+        break;
+      }
+    }
+  }
+  flushing = false;
+  render();
+}
+const REJECTED = [];
+
+window.addEventListener("online",  () => { ONLINE = true;  flush(); render(); });
+window.addEventListener("offline", () => { ONLINE = false; render(); });
+setInterval(() => { if(QUEUE.length) flush(); }, 20000);
+
+/* ------------------------------------------------------------------
+   State
+------------------------------------------------------------------ */
+let VIEW = "days";           // days | sheet | endofrun
+let DAYS = recall(K.days, null);
+let SHEET = recall(K.sheet, null);   // {date, direction, fetched_at, summary, rows}
+let LOCAL = {};              // booking_id -> "boarded" | "no_show" | null, before the send
+let ENDRUN = null;
+let MSG = null;
+
+const el = id => document.getElementById(id);
+const M = () => el("main");
+const esc = s => String(s == null ? "" : s)
+  .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+const hhmm = t => t ? String(t).slice(0, 5) : "";
+function niceDate(d){
+  try{ return new Date(d + "T12:00:00").toLocaleDateString("en-GB",
+    {weekday: "long", day: "numeric", month: "long"}); }catch(_){ return d; }
+}
+function howOld(iso){
+  if(!iso) return "";
+  const mins = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
+  if(mins < 1) return "just now";
+  if(mins < 60) return mins + (mins === 1 ? " minute ago" : " minutes ago");
+  const h = Math.round(mins / 60);
+  return h + (h === 1 ? " hour ago" : " hours ago");
+}
+
+/* ------------------------------------------------------------------
+   Rendering
+------------------------------------------------------------------ */
+function renderBanner(){
+  const b = el("banner");
+  const pending = QUEUE.length;
+  if(!ONLINE){
+    b.className = "banner off";
+    b.textContent = pending
+      ? "No signal. " + pending + (pending === 1 ? " tap" : " taps") +
+        " kept on this phone — they will send themselves. Carry on."
+      : "No signal. Everything you tap is kept on this phone. Carry on.";
+  }else if(pending){
+    b.className = "banner queued";
+    b.textContent = "Sending " + pending + (pending === 1 ? " tap" : " taps") + "…";
+  }else{
+    b.className = ""; b.textContent = "";
+  }
+}
+
+function render(){
+  renderBanner();
+  if(!SESSION) return renderSignIn();
+  if(ME && !ME.active) return renderNoAccess();
+  el("signout").classList.remove("hidden");
+  el("back").classList.toggle("hidden", VIEW === "days");
+  if(VIEW === "sheet") return renderSheet();
+  if(VIEW === "endofrun") return renderEndOfRun();
+  return renderDays();
+}
+
+function renderSignIn(){
+  el("signout").classList.add("hidden");
+  el("back").classList.add("hidden");
+  el("title").textContent = "Service 704 — the driver";
+  M().innerHTML = '<div class="card"><h2>Sign in</h2>' +
+    '<p class="muted">Sign in once, where there is signal. The phone stays signed in ' +
+    'afterwards, so you can carry on out of range.</p>' +
+    '<div id="err"></div>' +
+    '<label for="em">Email address</label><input id="em" type="email" autocomplete="username" inputmode="email">' +
+    '<label for="pw">Password</label><input id="pw" type="password" autocomplete="current-password">' +
+    '<p></p><button class="btn" id="go">Sign in</button></div>';
+  const go = async () => {
+    el("go").disabled = true; el("go").textContent = "Signing in…";
+    try{
+      setSession(await authPost("password", {email: el("em").value.trim(), password: el("pw").value}));
+      await afterSignIn();
+    }catch(e){
+      el("err").innerHTML = '<div class="bad">' + esc(/Invalid login/i.test(e.message)
+        ? "That email address and password do not match an account." : e.message) + '</div>';
+      el("go").disabled = false; el("go").textContent = "Sign in";
+    }
+  };
+  el("go").onclick = go;
+  el("pw").onkeydown = e => { if(e.key === "Enter") go(); };
+}
+
+function renderNoAccess(){
+  M().innerHTML = '<div class="card"><h2>Your account is not set up yet</h2>' +
+    '<p>You have signed in, but nobody has said what you are allowed to do.</p>' +
+    '<p class="muted">Ask Duncan to add ' + esc(ME.email || "your email address") +
+    ' on the office screen.</p></div>';
+}
+
+function renderDays(){
+  el("title").textContent = "Which day";
+  let html = "";
+  if(MSG) html += '<div class="card"><div class="good">' + esc(MSG) + '</div></div>';
+  if(!DAYS){
+    html += '<div class="card">Loading the days…</div>';
+  }else if(!DAYS.length){
+    html += '<div class="card"><p>No operating days found. Pull down when you have signal.</p></div>';
+  }else{
+    DAYS.forEach(d => {
+      html += '<button class="daybtn' + (d.is_today ? " today" : "") +
+        (d.stood_down ? " down" : "") + '" data-d="' + esc(d.service_date) + '">' +
+        '<span><strong>' + (d.is_today ? "Today" : esc(d.day_name)) + '</strong><br>' +
+        '<span class="muted">' + esc(niceDate(d.service_date)) +
+        (d.stood_down ? " · STOOD DOWN" : "") +
+        (Number(d.needs_tidying) > 0 ? " · " + d.needs_tidying + " to tidy up" : "") +
+        '</span></span>' +
+        '<span class="n">' + d.people + '</span></button>';
+    });
+  }
+  html += '<button class="btn ghost" id="refresh">Fetch the days again</button>';
+  M().innerHTML = html;
+  M().querySelectorAll(".daybtn").forEach(b => {
+    b.onclick = () => openDay(b.dataset.d, null);
+  });
+  el("refresh").onclick = loadDays;
+}
+
+function renderSheet(){
+  const s = SHEET;
+  el("title").textContent = s ? (s.date === todayISO() ? "Today" : niceDate(s.date)) : "The run";
+  if(!s){ M().innerHTML = '<div class="card">Loading…</div>'; return; }
+
+  const j = (s.summary && s.summary.journeys || []).find(x => x.direction === s.direction);
+  const rows = s.rows.filter(r => r.direction === s.direction);
+
+  let html = '<div class="card">' +
+    '<div class="pick">' +
+      '<button data-dir="outward" aria-pressed="' + (s.direction === "outward") + '">To Inverness</button>' +
+      '<button data-dir="return" aria-pressed="' + (s.direction === "return") + '">Home</button>' +
+    '</div>';
+
+  if(j && j.stood_down){
+    html += '<div class="bad"><strong>This run is stood down.</strong>' +
+      (j.reason ? ' ' + esc(j.reason) : '') +
+      (Number(j.not_told) > 0
+        ? '<br>' + j.not_told + (Number(j.not_told) === 1 ? " passenger has" : " passengers have") +
+          ' not been told yet.' : '') + '</div>';
+  }
+  html += '<div class="muted">' +
+    (j ? (j.people + (Number(j.people) === 1 ? " person" : " people") + " booked, " +
+          j.bookings + (Number(j.bookings) === 1 ? " booking" : " bookings")) : "Nothing booked") +
+    (j && j.trailer_needed ? ' · <strong>trailer needed</strong>' : '') +
+    (j && Number(j.overrides) > 0 ? ' · ' + j.overrides + ' on seat 13/14' : '') +
+    '<br>List fetched ' + esc(howOld(s.fetched_at)) + '.</div>' +
+    '</div>';
+
+  if(!rows.length){
+    html += '<div class="card"><p>Nobody booked on this run.</p>' +
+      '<p class="muted">Anyone who flags the bus down is a walk-on — the button is at the ' +
+      'bottom.</p></div>';
+  }
+
+  rows.forEach(r => {
+    const state = LOCAL[r.booking_id] !== undefined ? LOCAL[r.booking_id]
+                 : (r.boarded ? "boarded" : (r.no_show ? "no_show" : null));
+    html += '<div class="pax' + (state === "boarded" ? " on" : (state === "no_show" ? " off" : "")) +
+      '" data-id="' + esc(r.booking_id) + '">' +
+      '<div><span class="time">' + esc(hhmm(r.estimated_time || r.scheduled_time)) + '</span>' +
+      '<span class="stop">' + esc(r.pickup) + '</span></div>' +
+      (r.pickup_detail ? '<div class="sub">' + esc(r.pickup_detail) + '</div>' : '') +
+      '<div class="name">' + esc(r.lead_name) + ' · ' + r.party_size +
+        (Number(r.party_size) === 1 ? "" : " people") + '</div>' +
+      (r.other_names ? '<div class="sub">with ' + esc(r.other_names) + '</div>' : '') +
+      '<div class="sub">off at ' + esc(r.drop_off) + '</div>' +
+      (r.telephone ? '<a class="tel" href="tel:' +
+        esc(String(r.telephone).replace(/\s/g, "")) + '">' + esc(r.telephone) + '</a>' : '') +
+      '<div class="flags">' +
+        (r.requirements ? '<span class="flag warn">' + esc(r.requirements) + '</span>' : '') +
+        (r.needs_trailer ? '<span class="flag warn">trailer</span>' : '') +
+        (r.is_override ? '<span class="flag warn">seat 13/14</span>' : '') +
+        (r.can_be_texted === false ? '<span class="flag bad">no text — ring only</span>' : '') +
+        (r.not_told ? '<span class="flag bad">NOT TOLD the run is off</span>' : '') +
+      '</div>' +
+      (r.driver_note ? '<div class="note">' + esc(r.driver_note) + '</div>' : '') +
+      '<div class="acts">' +
+        '<button class="yes" data-act="boarded" aria-pressed="' + (state === "boarded") + '">On</button>' +
+        '<button class="no" data-act="no_show" aria-pressed="' + (state === "no_show") + '">Not here</button>' +
+      '</div></div>';
+  });
+
+  html += '<button class="btn secondary" id="walkon">Somebody flagged us down</button>' +
+    '<p></p><button class="btn ghost" id="refresh">Fetch the list again</button>' +
+    '<p></p><button class="btn ghost" id="endrun">End of the run</button>';
+
+  if(REJECTED.length){
+    html += '<div class="card"><div class="bad"><strong>' + REJECTED.length +
+      ' tap' + (REJECTED.length === 1 ? "" : "s") + ' could not be saved.</strong><br>' +
+      esc(REJECTED.map(x => x.rejected).join(" ")) + '<br>Ring the office.</div></div>';
+  }
+
+  M().innerHTML = html;
+
+  M().querySelectorAll(".pick button").forEach(b => {
+    b.onclick = () => { SHEET.direction = b.dataset.dir; keep(K.sheet, SHEET); render(); };
+  });
+  M().querySelectorAll(".pax .acts button").forEach(b => {
+    b.onclick = () => tap(b.closest(".pax").dataset.id, b.dataset.act);
+  });
+  el("walkon").onclick = walkOn;
+  el("refresh").onclick = () => openDay(SHEET.date, SHEET.direction);
+  el("endrun").onclick = () => { VIEW = "endofrun"; ENDRUN = null; loadEndOfRun(); };
+}
+
+function renderEndOfRun(){
+  el("title").textContent = "End of the run";
+  let html = '<div class="card"><h2>' +
+    (SHEET ? esc(niceDate(SHEET.date)) : "") + '</h2>';
+  if(!ENDRUN){
+    html += '<p>Loading… (this one needs signal.)</p></div>';
+    M().innerHTML = html;
+    return;
+  }
+  const s = ENDRUN.summary || {};
+  if(s.finished){
+    html += '<div class="good"><strong>Nothing left to do.</strong> ' +
+      (Number(s.walk_ons) > 0
+        ? s.walk_ons + (Number(s.walk_ons) === 1 ? " walk-on" : " walk-ons") +
+          ", " + s.people + " between them, all accounted for."
+        : "No walk-ons today.") + '</div>';
+  }else{
+    html += '<div class="note">Two questions the office cannot answer for you: where each ' +
+      'flagged-down passenger got on, and where they got off. Everything else can wait.</div>';
+  }
+  html += '</div>';
+
+  (ENDRUN.outstanding || []).forEach(o => {
+    html += '<div class="card" data-w="' + esc(o.walk_on_id) + '">' +
+      '<div class="name">' + o.boarded_count +
+        (Number(o.boarded_count) === 1 ? " person" : " people") + ' · ' +
+        (o.direction === "outward" ? "to Inverness" : "coming home") + '</div>' +
+      '<div class="sub">' + esc(o.got_on_at || "place not recorded") +
+        (o.note ? ' · ' + esc(o.note) : '') + '</div>' +
+      '<label>' + (o.kind === "walk_on_place" ? "Where did they get ON?" : "Where did they get OFF?") +
+      '</label>' +
+      '<select data-kind="' + esc(o.kind) + '"><option value="">— choose —</option>' +
+      (STOPS[o.direction] || []).map(st =>
+        '<option value="' + esc(st.id) + '">' + esc(st.n) + '</option>').join("") +
+      '</select></div>';
+  });
+
+  html += '<button class="btn ghost" id="back2">Back to the run</button>';
+  M().innerHTML = html;
+
+  M().querySelectorAll("select[data-kind]").forEach(sel => {
+    sel.onchange = async () => {
+      const id = sel.closest(".card").dataset.w;
+      if(!sel.value) return;
+      try{
+        if(sel.dataset.kind === "walk_on_place"){
+          await rpc("bus_driver_update_walk_on", {p_walk_on_id: id, p_pickup_point_id: sel.value});
+        }else{
+          await rpc("bus_driver_set_walk_on_destination",
+            {p_walk_on_id: id, p_pickup_point_id: sel.value});
+        }
+        await loadEndOfRun();
+      }catch(e){ window.alert(say(e)); }
+    };
+  });
+  el("back2").onclick = () => { VIEW = "sheet"; render(); };
+}
+
+/* ------------------------------------------------------------------
+   Doing things
+------------------------------------------------------------------ */
+function todayISO(){ return new Date().toISOString().slice(0, 10); }
+
+function tap(bookingId, event){
+  const row = SHEET.rows.find(r => r.booking_id === bookingId);
+  const current = LOCAL[bookingId] !== undefined ? LOCAL[bookingId]
+                 : (row.boarded ? "boarded" : (row.no_show ? "no_show" : null));
+  if(current === event){
+    /* Tapping the same one again undoes it - the wrong button gets
+       pressed, in the dark, with gloves on. */
+    LOCAL[bookingId] = null;
+    enqueue("bus_driver_untap", {p_booking_id: bookingId, p_event: event});
+  }else{
+    LOCAL[bookingId] = event;
+    enqueue("bus_driver_tap", {
+      p_booking_id: bookingId, p_event: event,
+      p_occurred_at: new Date().toISOString(),
+      p_recorded_offline_at: ONLINE ? null : new Date().toISOString()
+    });
+  }
+  render();
+}
+
+function walkOn(){
+  const raw = window.prompt("How many got on?\n\n(Where they got on and off can wait until " +
+    "the end of the run. Just the number now.)", "1");
+  if(raw === null) return;
+  const n = parseInt(raw, 10);
+  if(!(n >= 1)) return window.alert("That has to be a number, one or more.");
+
+  const send = (lat, lng, acc) => {
+    enqueue("bus_driver_walk_on", {
+      p_service_date: SHEET.date, p_direction: SHEET.direction, p_count: n,
+      p_latitude: lat, p_longitude: lng, p_accuracy_metres: acc,
+      p_occurred_at: new Date().toISOString(),
+      p_recorded_offline_at: ONLINE ? null : new Date().toISOString()
+    });
+    MSG = n + (n === 1 ? " person" : " people") + " recorded. Where they got on and off " +
+      "is asked at the end of the run.";
+    render();
+    setTimeout(() => { MSG = null; render(); }, 6000);
+  };
+
+  /* The phone's own position saves the driver typing a place name at a
+     road end. It is never required: refusing it costs one question at
+     the end of the run and nothing else.
+
+     THE WALK-ON IS RECORDED WHETHER OR NOT THE POSITION ARRIVES. Some
+     phones, and some browsers, never call either callback - permission
+     half-granted, the chip warming up, or the option timeout ignored.
+     A driver must not lose two passengers to a sulking GPS, so this
+     has its own clock and gives up on itself. */
+  let sent = false;
+  const once = (lat, lng, acc) => { if(!sent){ sent = true; send(lat, lng, acc); } };
+  if(navigator.geolocation){
+    setTimeout(() => once(null, null, null), 6000);
+    try{
+      navigator.geolocation.getCurrentPosition(
+        p => once(p.coords.latitude, p.coords.longitude, Math.round(p.coords.accuracy || 0)),
+        () => once(null, null, null),
+        {enableHighAccuracy: true, timeout: 5000, maximumAge: 30000});
+    }catch(_){ once(null, null, null); }
+  }else{
+    once(null, null, null);
+  }
+}
+
+const STOPS = {};
+async function loadStops(){
+  for(const dir of ["outward", "return"]){
+    if(STOPS[dir]) continue;
+    try{
+      const s = await rpc("bus_stops", {p_direction: dir});
+      STOPS[dir] = s.map(x => ({id: x.id, n: x.name, o: Number(x.route_order)}))
+                    .sort((a, b) => a.o - b.o);
+      keep("bus704.driver.stops." + dir, STOPS[dir]);
+    }catch(_){
+      STOPS[dir] = recall("bus704.driver.stops." + dir, []);
+    }
+  }
+}
+
+async function loadDays(){
+  try{
+    DAYS = await rpc("bus_driver_upcoming", {p_count: 8});
+    keep(K.days, DAYS);
+  }catch(e){
+    if(!DAYS) MSG = say(e);
+  }
+  render();
+}
+
+async function openDay(date, direction){
+  VIEW = "sheet";
+  const keepDir = direction || (SHEET && SHEET.date === date ? SHEET.direction : null) || "outward";
+  if(!SHEET || SHEET.date !== date) SHEET = {date, direction: keepDir, rows: [], summary: null};
+  SHEET.direction = keepDir;
+  render();
+  try{
+    const [summary, rows] = await Promise.all([
+      rpc("bus_driver_day", {p_service_date: date}),
+      rpc("bus_driver_sheet", {p_service_date: date})
+    ]);
+    SHEET = {date, direction: keepDir, summary, rows: rows || [],
+             fetched_at: new Date().toISOString()};
+    LOCAL = {};
+    keep(K.sheet, SHEET);
+    ONLINE = true;
+  }catch(e){
+    /* No signal, or no sheet yet. If the phone already holds this day,
+       show it and say how old it is - which is the whole point. */
+    if(!SHEET.rows.length && !SHEET.fetched_at) MSG = say(e);
+    ONLINE = navigator.onLine !== false ? ONLINE : false;
+  }
+  render();
+}
+
+async function loadEndOfRun(){
+  render();
+  await loadStops();
+  try{
+    const [summary, outstanding] = await Promise.all([
+      rpc("bus_driver_end_of_run", {p_service_date: SHEET.date}),
+      rpc("bus_driver_outstanding", {p_service_date: SHEET.date})
+    ]);
+    ENDRUN = {summary, outstanding: outstanding || []};
+  }catch(e){
+    ENDRUN = {summary: {finished: false}, outstanding: []};
+    MSG = say(e);
+  }
+  render();
+}
+
+/* ------------------------------------------------------------------
+   Start
+------------------------------------------------------------------ */
+el("signout").onclick = () => {
+  if(QUEUE.length && !window.confirm(
+      QUEUE.length + " tap" + (QUEUE.length === 1 ? " has" : "s have") +
+      " not been sent yet. Signing out will lose them. Sign out anyway?")) return;
+  setSession(null); ME = null;
+  forget(K.sheet); forget(K.days); forget(K.queue);
+  QUEUE = []; SHEET = null; DAYS = null; VIEW = "days";
+  render();
+};
+el("back").onclick = () => {
+  VIEW = VIEW === "endofrun" ? "sheet" : "days";
+  render();
+};
+
+async function afterSignIn(){
+  M().innerHTML = '<div class="card">Just a moment…</div>';
+  try{ ME = await rpc("bus_staff_whoami", {}); }
+  catch(e){ setSession(null); ME = null; return render(); }
+  if(!ME.active) return render();
+  VIEW = "days";
+  render();
+  flush();
+  loadDays();
+  loadStops();
+}
+
+if(SESSION) afterSignIn(); else render();
+</script>
+</body>
+</html>
