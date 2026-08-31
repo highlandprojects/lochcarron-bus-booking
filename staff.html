@@ -342,6 +342,15 @@ const SAY = {
   no_room_on_the_busiest_section:
     "There is genuinely no room on the busiest part of that journey, even with seats 13 and 14.",
   booking_not_found: "That booking is not there any more — reload the day.",
+  not_permitted: "Your account is not allowed to change bookings.",
+  booking_already_cancelled:
+    "That booking is already cancelled, so there is nothing to change. If they want to travel " +
+    "after all, take a new booking.",
+  no_such_stop:
+    "That stop is not on the route any more. Reload the day and choose again.",
+  no_way_to_reach_them:
+    "Leave at least one way to reach them — a mobile, a landline or an email. A landline on " +
+    "its own is fine. To take every contact away you would have to cancel the booking.",
   booking_is_not_confirmed: "That booking is already cancelled.",
   party_size_must_be_at_least_one:
     "A booking has to be for at least one person. To take it to nobody, cancel it.",
@@ -353,7 +362,11 @@ const SAY = {
     "NOTHING will reach them automatically — somebody will have to ring. That is allowed, " +
     "and it is normal on this route. Say so below and press the button again."
 };
-function say(err){
+/* The second argument is what did NOT happen, and it matters. The old
+   wording said "NOTHING has been booked" whatever went wrong, which is a
+   lie on the amend panel - the office reads it, believes the booking is
+   gone, and takes it again. */
+function say(err, what){
   const code = (err && err.code) || String((err && err.message) || err);
   if(SAY[code]) return SAY[code];
   if(/^choose_a_stop_in/.test(code)){
@@ -364,7 +377,7 @@ function say(err){
   if(/Bicycles are not carried/.test(code)) return code;
   if(/duplicate key|already exists/i.test(code))
     return "That looks like it has already been entered. Reload the day and check.";
-  return "It did not go through, and NOTHING has been booked. " +
+  return "It did not go through, and NOTHING has been " + (what || "booked") + ". " +
          "What the database said was: " + code;
 }
 
@@ -730,9 +743,14 @@ function renderDay(){
             ' of twelve' + (Number(row.seats_left_max) > left ?
               ' &middot; ' + Number(row.seats_left_max) + ' with 13 and 14' : '') + '</span>' +
         '</div>' +
+        /* NO BOOKING OR PASSENGER COUNT. Removed on the operator's
+           instruction, 31 Aug 2026: a count of bookings is not a count of
+           passengers - people get on and off along the road, walk-ons are
+           never booked, and a party of three is one booking. A number that
+           is nearly right is worse than none, because somebody eventually
+           quotes it. Seats left stays: that is capacity on the busiest
+           section, and it IS accurate. */
         '<div class="chips">' +
-          '<span class="chip">' + row.bookings + ' booking' + (Number(row.bookings) === 1 ? '' : 's') +
-            ', ' + row.people + ' travelling</span>' +
           (row.journey_status && row.journey_status !== "planned" && row.journey_status !== "confirmed"
             ? '<span class="chip warn">' + esc(row.journey_status) + '</span>' : '') +
           (Number(row.needs_telephoning) > 0
@@ -762,7 +780,7 @@ function renderDay(){
             (b.notes ? '<div class="where">Note: ' + esc(b.notes) + '</div>' : '') +
           '</div>' +
           '<div class="acts">' +
-            '<button class="btn secondary small" data-act="party">Change number</button>' +
+            '<button class="btn secondary small" data-act="amend">Amend booking</button>' +
             '<button class="btn danger small" data-act="cancel">Cancel</button>' +
           '</div>' +
         '</div>';
@@ -774,18 +792,20 @@ function renderDay(){
 
   el("dd").onchange = e => { day.date = e.target.value; loadDay(); };
   el("dtoday").onclick = () => { day.date = today(); loadDay(); };
+  /* NEXT DAY MEANS THE NEXT DAY THE BUS RUNS, not tomorrow. Stepping one
+     calendar day lands on a Tuesday four times out of five and shows a
+     screen that cannot be acted on. */
   el("dnext").onclick = () => {
-    const d = new Date(day.date + "T12:00:00");
-    d.setDate(d.getDate() + 1);
-    day.date = d.toISOString().slice(0, 10);
-    loadDay();
+    const list = DAYS || [];
+    const next = list.find(d => d.date > day.date);
+    if(next){ day.date = next.date; loadDay(); }
   };
   M().querySelectorAll(".bk .acts button").forEach(btn => {
     btn.onclick = () => {
       const id = btn.closest(".bk").dataset.id;
       const b = day.bookings.find(x => x.booking_id === id);
       if(btn.dataset.act === "cancel") return doCancel(b);
-      return doParty(b);
+      return openAmend(b);
     };
   });
 }
@@ -818,32 +838,190 @@ async function doCancel(b){
   }catch(e){ window.alert(say(e)); }
 }
 
-async function doParty(b){
-  const raw = window.prompt(
-    "How many are travelling on " + b.reference + " now?\n\n" +
-    "(It is " + b.party_size + " at the moment. Companions count as passengers.)",
-    String(b.party_size));
-  if(raw === null) return;
-  const n = parseInt(raw, 10);
-  if(!(n >= 1)) return window.alert("That has to be a number, one or more.");
+/* --------------------------- Amend --------------------------- */
+/* Replaces the old "Change number", which changed exactly one field. On the
+   telephone a caller says "actually pick me up at the hall instead, and my
+   mobile's changed" - and the office needed two screens and a cancel.
+
+   Everything that can change mid-call is here in one panel. The DAY and the
+   DIRECTION are deliberately absent: they decide which journey the booking
+   sits on, and quietly moving somebody between runs is how a passenger ends
+   up on Monday's sheet believing they are booked for Saturday. A different
+   day is a cancel and a rebook, which leaves both facts on the record. */
+let AMEND = null;   // {b, party, pickup, dest, mobile, email, landline, note, others}
+
+async function openAmend(b){
+  AMEND = {
+    b: b,
+    party:    String(b.party_size || 1),
+    pickup:   b.pickup_point_id || "",
+    dest:     b.destination_point_id || "",
+    mobile:   b.mobile   || "",
+    email:    b.email    || "",
+    landline: b.landline || "",
+    note:     "",
+    others:   b.other_passengers || "",
+    error:    ""
+  };
+  /* The stop list for this direction must be IN HAND before the panel is
+     drawn. Drawing first and filling in afterwards leaves the office
+     looking at an empty dropdown under the words "where they get on", and
+     an empty dropdown there is an invitation to save a blank.
+
+     There is no stopOptions() of its own here on purpose: the take-a-
+     booking screen already has one, further down this file, and a second
+     function of the same name silently replaced it. Both dropdowns came up
+     empty and nothing said why. One list of stops, drawn one way. */
+  try{ await loadDirection(b.direction || "outward"); }
+  catch(e){ AMEND.error = say(e, "changed"); }
+  renderAmend();
+}
+
+function renderAmend(){
+  if(!AMEND) return;
+  const b = AMEND.b;
+  const dir = b.direction || "outward";
+  M().innerHTML =
+    '<div class="card">' +
+      '<h2>Amend booking</h2>' +
+      '<p class="muted">' + esc(b.lead_name || "") + ' &middot; ' +
+        esc(b.reference) + ' &middot; ' + esc(niceDate(day.date)) + ' &middot; ' +
+        (dir === "outward" ? "to Inverness" : "home from Inverness") + '</p>' +
+      '<p class="muted">To move somebody to a different day, cancel this and take a new ' +
+        'booking - that way both are on the record.</p>' +
+      (AMEND.error ? '<div class="bad">' + esc(AMEND.error) + '</div>' : '') +
+
+      '<label for="am_pt">How many travelling</label>' +
+      '<input id="am_pt" type="number" min="1" max="14" value="' + esc(AMEND.party) + '">' +
+
+      '<label for="am_on">Where they get on</label>' +
+      '<select id="am_on">' + stopOptions(dir, AMEND.pickup) + '</select>' +
+
+      /* Where they get off is limited to stops FURTHER ALONG the run than
+         where they get on, exactly as it is when the booking is taken. A
+         passenger cannot get off before they get on, and the fare is worked
+         out between the two, so the pair has to stay in order. */
+      '<label for="am_off">Where they get off</label>' +
+      '<select id="am_off">' + stopOptions(dir, AMEND.dest, amendBoardOrder()) + '</select>' +
+
+      '<label for="am_mob">Mobile</label>' +
+      '<input id="am_mob" type="tel" value="' + esc(AMEND.mobile) + '">' +
+      '<label for="am_em">Email</label>' +
+      '<input id="am_em" type="email" value="' + esc(AMEND.email) + '">' +
+      '<label for="am_ll">Landline</label>' +
+      '<input id="am_ll" type="tel" value="' + esc(AMEND.landline) + '">' +
+      '<p class="muted">Leave all three as they are if the caller has not changed them. ' +
+        'A landline on its own means somebody has to ring them if the run is stood down.</p>' +
+
+      '<label for="am_ot">Anyone else travelling, by name <span class="hint">One per line</span></label>' +
+      '<textarea id="am_ot">' + esc(AMEND.others) + '</textarea>' +
+
+      '<label for="am_nt">Add a note for the driver <span class="hint">Added to the booking; ' +
+        'earlier notes are kept</span></label>' +
+      '<textarea id="am_nt">' + esc(AMEND.note) + '</textarea>' +
+
+      '<div style="height:.8rem"></div>' +
+      '<button class="btn" id="am_save" type="button">Save the changes</button>' +
+      '<div style="height:.5rem"></div>' +
+      '<button class="btn secondary" id="am_back" type="button">Leave it as it is</button>' +
+    '</div>';
+
+  const keep = () => {
+    AMEND.party    = el("am_pt").value;
+    const wasOn    = AMEND.pickup;
+    AMEND.pickup   = el("am_on").value;
+    AMEND.dest     = el("am_off").value;
+    AMEND.mobile   = el("am_mob").value;
+    AMEND.email    = el("am_em").value;
+    AMEND.landline = el("am_ll").value;
+    AMEND.others   = el("am_ot").value;
+    AMEND.note     = el("am_nt").value;
+    /* Moving where they get on can leave where they get off behind it - the
+       caller who changes Toscaig to Inverness has no valid stop left. Redraw
+       the second list, and drop a destination that is now before the start
+       rather than leaving an impossible pair on the screen. */
+    if(AMEND.pickup !== wasOn){
+      const min = amendBoardOrder();
+      const d = (DIR[dir] || []).find(s => s.id === AMEND.dest);
+      if(min != null && d && d.o <= min) AMEND.dest = "";
+      return renderAmend();
+    }
+  };
+  M().querySelectorAll("input,select,textarea").forEach(i => { i.onchange = keep; i.oninput = keep; });
+  el("am_back").onclick = () => { AMEND = null; render(); };
+  el("am_save").onclick = () => { keep(); saveAmend(false, null, false); };
+}
+
+/* Where a stop sits along the run, from the list the page already loaded.
+   The route order is what the driver's sheet sorts by and what the fare is
+   worked out between, so it travels with the stop or the passenger ends up
+   in the wrong place on the run and on the wrong fare. */
+function stopOrderOf(dir, id){
+  const s = (DIR[dir] || []).find(x => x.id === id);
+  return s ? s.o : null;
+}
+function amendBoardOrder(){
+  if(!AMEND) return null;
+  return stopOrderOf(AMEND.b.direction || "outward", AMEND.pickup);
+}
+
+async function saveAmend(override, overrideReason, confirmNoContact){
+  const b = AMEND.b;
+  const dir = b.direction || "outward";
+  const stopOrder = id => stopOrderOf(dir, id);
+  /* Only send what actually changed. A null tells the database to leave a
+     field alone, so a box nobody touched can never blank something. */
+  const args = {
+    p_booking_id: b.booking_id,
+    p_party_size: Number(AMEND.party) !== Number(b.party_size) ? Number(AMEND.party) : null,
+    p_pickup_point_id: AMEND.pickup && AMEND.pickup !== b.pickup_point_id ? AMEND.pickup : null,
+    p_board_route_order: AMEND.pickup && AMEND.pickup !== b.pickup_point_id ? stopOrder(AMEND.pickup) : null,
+    p_destination_point_id: AMEND.dest && AMEND.dest !== b.destination_point_id ? AMEND.dest : null,
+    p_alight_route_order: AMEND.dest && AMEND.dest !== b.destination_point_id ? stopOrder(AMEND.dest) : null,
+    p_note: AMEND.note.trim() ? AMEND.note.trim() : null,
+    p_other_passengers: AMEND.others !== (b.other_passengers || "") ? AMEND.others : null,
+    p_override: !!override,
+    p_override_reason: overrideReason,
+    p_confirm_no_contact: !!confirmNoContact
+  };
+  const contactTouched =
+    AMEND.mobile !== (b.mobile || "") || AMEND.email !== (b.email || "") ||
+    AMEND.landline !== (b.landline || "");
+  if(contactTouched){
+    args.p_mobile = AMEND.mobile; args.p_email = AMEND.email; args.p_landline = AMEND.landline;
+  }
+
   try{
-    await rpc("bus_staff_change_party_size",
-      {p_booking_id: b.booking_id, p_new_size: n, p_override: false, p_override_reason: null});
+    const res = await rpc("bus_staff_amend_booking", args);
+    if(res && res.ok === false){
+      /* The same two-press guard as taking a booking: a booking that
+         QUIETLY becomes landline-only is worse than one that always was,
+         because nobody expects it. */
+      if(res.reason === "no_auto_contact_needs_acknowledgement"){
+        if(window.confirm(SAY.no_auto_contact_needs_acknowledgement ||
+             "Nothing will reach this passenger automatically. Somebody must ring them if the run is stood down. Save it anyway?")){
+          return saveAmend(override, overrideReason, true);
+        }
+        return;
+      }
+      if(res.reason === "full_but_override_possible"){
+        const why = window.prompt(SAY.full_but_override_possible +
+          "\n\nWhy are you using seat 13 or 14?", "");
+        if(!why) return;
+        return saveAmend(true, why, confirmNoContact);
+      }
+      AMEND.error = say({code: res.reason}, "changed"); return renderAmend();
+    }
+    AMEND = null;
     await loadDay();
   }catch(e){
     if((e.code || "") === "full_but_override_possible"){
-      const why = window.prompt(
-        SAY.full_but_override_possible + "\n\n" + wording("office_override_wording", "") +
-        "\n\nWhy are you using one?", "");
+      const why = window.prompt(SAY.full_but_override_possible +
+        "\n\nWhy are you using seat 13 or 14?", "");
       if(!why) return;
-      try{
-        await rpc("bus_staff_change_party_size",
-          {p_booking_id: b.booking_id, p_new_size: n, p_override: true, p_override_reason: why});
-        await loadDay();
-      }catch(e2){ window.alert(say(e2)); }
-      return;
+      return saveAmend(true, why, confirmNoContact);
     }
-    window.alert(say(e));
+    AMEND.error = say(e, "changed"); renderAmend();
   }
 }
 
