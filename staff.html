@@ -1,0 +1,1189 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Service 704 — the office</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/4.7.1/maplibre-gl.min.css">
+<style>
+  :root{
+    --ink:#16232e; --ink-soft:#48606f; --line:#c8d4dc; --paper:#fff; --wash:#eef3f6;
+    --blue:#1f5f8b; --blue-dark:#164a6d; --blue-wash:#e8f1f7; --green:#1d6b45;
+    --green-wash:#e6f2eb; --red:#a3241c; --red-wash:#fbeceb;
+    --amber-wash:#fdf3e0; --amber-line:#c88a1e;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
+       color:var(--ink);background:var(--wash);font-size:16px;line-height:1.5}
+  header{background:var(--blue);color:#fff;padding:.75rem 1rem;display:flex;
+         align-items:center;gap:.75rem;flex-wrap:wrap}
+  header h1{margin:0;font-size:1.05rem;flex:1 1 auto}
+  header .who{font-size:.85rem;opacity:.9}
+  header button{font:inherit;font-size:.85rem;background:rgba(255,255,255,.15);color:#fff;
+                border:1px solid rgba(255,255,255,.4);border-radius:8px;padding:.3rem .7rem;cursor:pointer}
+  nav{display:flex;background:var(--paper);border-bottom:1px solid var(--line);
+      position:sticky;top:0;z-index:5;overflow-x:auto}
+  nav button{flex:1 1 auto;min-height:48px;font:inherit;font-weight:600;cursor:pointer;
+             border:none;background:none;color:var(--ink-soft);padding:.5rem .9rem;white-space:nowrap;
+             border-bottom:3px solid transparent}
+  nav button[aria-selected="true"]{color:var(--blue);border-bottom-color:var(--blue)}
+  main{max-width:820px;margin:0 auto;padding:1rem}
+  .card{background:var(--paper);border:1px solid var(--line);border-radius:12px;
+        padding:1rem;margin-bottom:1rem}
+  .card h2{margin:0 0 .5rem;font-size:1rem;color:var(--blue)}
+  .card h3{margin:1rem 0 .4rem;font-size:.9rem;color:var(--ink-soft);
+           text-transform:uppercase;letter-spacing:.05em}
+  label{display:block;font-weight:600;font-size:.9rem;margin:.75rem 0 .25rem}
+  label .hint{display:block;font-weight:400;color:var(--ink-soft);font-size:.85rem}
+  input,select,textarea{font:inherit;width:100%;padding:.6rem .7rem;border:2px solid var(--line);
+                        border-radius:9px;background:var(--paper);color:var(--ink);min-height:46px}
+  input:focus,select:focus,textarea:focus{outline:3px solid var(--blue-wash);border-color:var(--blue)}
+  textarea{min-height:80px}
+  .row{display:flex;gap:.6rem;flex-wrap:wrap}
+  .row>*{flex:1 1 160px}
+  .btn{font:inherit;font-weight:600;min-height:48px;border-radius:10px;cursor:pointer;
+       border:2px solid var(--blue);background:var(--blue);color:#fff;padding:.5rem 1.1rem;
+       display:inline-flex;align-items:center;justify-content:center;gap:.4rem}
+  .btn.secondary{background:var(--paper);color:var(--blue)}
+  .btn.danger{background:var(--paper);color:var(--red);border-color:var(--red)}
+  .btn.small{min-height:38px;font-size:.85rem;padding:.3rem .7rem;border-width:1px}
+  .btn[disabled]{opacity:.5;cursor:default}
+  .btn.wide{width:100%}
+  .pick{display:flex;gap:.6rem;margin:.5rem 0}
+  .pick button{flex:1;min-height:56px;font:inherit;font-weight:600;cursor:pointer;
+               border:2px solid var(--line);background:var(--paper);color:var(--blue);border-radius:10px}
+  .pick button[aria-pressed="true"]{background:var(--blue);color:#fff;border-color:var(--blue)}
+  .note{background:var(--amber-wash);border-left:5px solid var(--amber-line);
+        padding:.7rem .9rem;border-radius:0 8px 8px 0;margin:.75rem 0;font-size:.92rem}
+  .bad{background:var(--red-wash);border-left:5px solid var(--red);padding:.7rem .9rem;
+       border-radius:0 8px 8px 0;margin:.75rem 0;font-size:.95rem}
+  .good{background:var(--green-wash);border-left:5px solid var(--green);padding:.7rem .9rem;
+        border-radius:0 8px 8px 0;margin:.75rem 0}
+  .journey{border:1px solid var(--line);border-radius:12px;background:var(--paper);
+           padding:.9rem;margin-bottom:.9rem}
+  .journey .head{display:flex;align-items:baseline;gap:.6rem;flex-wrap:wrap}
+  .journey .head strong{font-size:1.02rem}
+  .seats{font-weight:700;font-size:1.4rem;color:var(--green)}
+  .seats.low{color:var(--amber-line)}
+  .seats.none{color:var(--red)}
+  .chips{display:flex;gap:.4rem;flex-wrap:wrap;margin-top:.35rem}
+  .chip{font-size:.78rem;padding:.15rem .55rem;border-radius:20px;background:var(--blue-wash);color:var(--blue)}
+  .chip.warn{background:var(--amber-wash);color:#8a5c05}
+  .chip.tel{background:var(--red-wash);color:var(--red)}
+  .bk{border-top:1px solid #eef2f5;padding:.7rem 0;display:flex;gap:.6rem;
+      align-items:flex-start;flex-wrap:wrap}
+  .bk .main{flex:1 1 240px;min-width:0}
+  .bk .ref{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.8rem;color:var(--ink-soft)}
+  .bk .where{font-size:.9rem;color:var(--ink-soft)}
+  .bk .acts{display:flex;gap:.4rem;flex-wrap:wrap}
+  table{width:100%;border-collapse:collapse}
+  th,td{padding:.5rem .55rem;text-align:left;border-bottom:1px solid #eef2f5;font-size:.9rem;
+        vertical-align:top}
+  th{background:var(--blue-wash);color:var(--blue);font-size:.75rem;
+     text-transform:uppercase;letter-spacing:.04em}
+  .results{border:1px solid var(--line);border-radius:10px;overflow:hidden;margin-top:.5rem}
+  .results button{display:block;width:100%;text-align:left;font:inherit;background:var(--paper);
+                  border:none;border-bottom:1px solid #eef2f5;padding:.6rem .7rem;cursor:pointer}
+  .results button:hover{background:var(--blue-wash)}
+  .results button:last-child{border-bottom:none}
+  .results .sub{display:block;font-size:.83rem;color:var(--ink-soft)}
+  .checks{display:grid;gap:.4rem;margin-top:.4rem}
+  .checks label{display:flex;gap:.55rem;align-items:flex-start;font-weight:400;margin:0;
+                border:1px solid var(--line);border-radius:9px;padding:.5rem .6rem;background:var(--paper)}
+  .checks input{width:22px;height:22px;min-height:0;flex:0 0 auto;margin-top:2px}
+  .mapholder{height:340px;width:100%;border:1px solid var(--line);border-radius:10px;
+             overflow:hidden;margin-top:.5rem}
+  #staffmap{height:100%;width:100%}
+  .muted{color:var(--ink-soft);font-size:.88rem}
+  .hidden{display:none !important}
+  footer{padding:1.5rem 1rem 3rem;text-align:center;color:var(--ink-soft);font-size:.82rem}
+  @media (max-width:520px){ main{padding:.6rem} .card{padding:.8rem} }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Service 704 — the office</h1>
+  <span class="who" id="who"></span>
+  <button id="signout" class="hidden">Sign out</button>
+</header>
+
+<nav id="tabs" class="hidden">
+  <button data-tab="day" aria-selected="true">The day</button>
+  <button data-tab="take" aria-selected="false">Take a booking</button>
+  <button data-tab="ring" aria-selected="false">To telephone</button>
+  <button data-tab="people" aria-selected="false" class="hidden">Who can use this</button>
+</nav>
+
+<main id="main"><div class="card">Loading…</div></main>
+
+<footer>Lochcarron Garage · Service 704 · this screen is for staff. Customers book at
+  <a href="./">the public page</a>.</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/4.7.1/maplibre-gl.min.js"></script>
+<script>
+"use strict";
+/* =====================================================================
+   The office screen: taking a booking over the telephone.
+
+   Written for the way the garage actually works. Most Service 704
+   customers are elderly and ring rather than tap, so the person on this
+   screen is holding a telephone in one hand. That shapes everything:
+
+     - ONE FORM, not a wizard. A caller says "Tuesday, two of us, from
+       the Post Office to Dingwall" in one breath, and the person taking
+       it should be able to type it in the same order without pressing
+       Next four times.
+     - THE ANSWER TO "IS THERE ROOM" IS ALWAYS ON SCREEN. Seats left is
+       the busiest section, never a head count.
+     - EVERY REFUSAL SAYS WHAT TO DO NEXT. "The bus is full" is no use on
+       the telephone; "the bus is full at twelve, but seat thirteen
+       exists if you will write down why" is.
+
+   The database is the authority for all of it. This page can be wrong,
+   cached or out of date; the functions it calls cannot be talked round.
+===================================================================== */
+
+const SUPABASE_URL = "https://sswidsjglvpbbthsqwdy.supabase.co";
+const ANON_KEY = "sb_publishable_HYylK1k8WEtN3RC56zXNXA_ViLb3Zuw";
+const STORE_KEY = "bus704.office.session";
+
+/* ------------------------------------------------------------------
+   Signing in
+------------------------------------------------------------------ */
+let SESSION = null;   // {access_token, refresh_token, expires_at}
+let ME = null;        // what bus_staff_whoami() said
+
+function loadSession(){
+  try{
+    const raw = window.localStorage.getItem(STORE_KEY);
+    if(raw) SESSION = JSON.parse(raw);
+  }catch(_){ SESSION = null; }
+}
+function saveSession(s){
+  SESSION = s;
+  try{
+    if(s) window.localStorage.setItem(STORE_KEY, JSON.stringify(s));
+    else window.localStorage.removeItem(STORE_KEY);
+  }catch(_){}
+}
+
+async function authPost(grant, body){
+  const r = await fetch(SUPABASE_URL + "/auth/v1/token?grant_type=" + grant, {
+    method: "POST",
+    headers: {apikey: ANON_KEY, "Content-Type": "application/json"},
+    body: JSON.stringify(body)
+  });
+  const j = await r.json().catch(() => ({}));
+  if(!r.ok) throw new Error(j.error_description || j.msg || j.error || "sign_in_failed");
+  return {
+    access_token: j.access_token,
+    refresh_token: j.refresh_token,
+    expires_at: Date.now() + ((j.expires_in || 3600) - 60) * 1000
+  };
+}
+
+async function signIn(email, password){
+  saveSession(await authPost("password", {email: email, password: password}));
+}
+
+async function freshToken(){
+  if(!SESSION) throw new Error("not_signed_in");
+  if(SESSION.expires_at && Date.now() > SESSION.expires_at){
+    saveSession(await authPost("refresh_token", {refresh_token: SESSION.refresh_token}));
+  }
+  return SESSION.access_token;
+}
+
+/* Every call to the database goes through here, so there is one place
+   that knows about tokens and one place that turns a database error into
+   a sentence. */
+async function rpc(fn, args){
+  const token = await freshToken();
+  const r = await fetch(SUPABASE_URL + "/rest/v1/rpc/" + fn, {
+    method: "POST",
+    headers: {
+      apikey: ANON_KEY,
+      Authorization: "Bearer " + token,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(args || {})
+  });
+  if(r.status === 401){
+    saveSession(null);
+    throw new Error("your_sign_in_has_run_out");
+  }
+  const text = await r.text();
+  let body = null;
+  try{ body = text ? JSON.parse(text) : null; }catch(_){ body = null; }
+  if(!r.ok){
+    const e = new Error((body && (body.message || body.hint)) || text || "request_failed");
+    e.code = body && body.message ? String(body.message) : "";
+    throw e;
+  }
+  return body;
+}
+
+/* ------------------------------------------------------------------
+   Turning a database error into something to say on the telephone
+------------------------------------------------------------------ */
+const SAY = {
+  not_permitted_to_take_bookings:
+    "Your account is not allowed to take bookings. Ask Duncan to give you access.",
+  not_permitted_to_cancel:
+    "Your account is not allowed to cancel bookings.",
+  not_permitted_to_amend:
+    "Your account is not allowed to change bookings.",
+  lead_passenger_name_required:
+    "Put the caller's name in first — the driver needs to know who to look for.",
+  invalid_direction: "Choose which way the bus is going.",
+  invalid_journey_span:
+    "The setting-down place has to be further along the route than the pick-up.",
+  pickup_required: "Choose where the bus is picking them up.",
+  destination_required: "Choose where they are getting off.",
+  some_way_to_reach_them_required:
+    "We need at least one way to reach them — a mobile, a landline or an email. " +
+    "A landline on its own is fine on the telephone.",
+  office_deadline_passed:
+    "The office deadline has gone for that day. The website stays open until 6pm the day " +
+    "before, because it does not need anybody to be in — you can offer them that. Otherwise " +
+    "it is a manager's decision.",
+  deadline_passed:
+    "The deadline has gone for that day.",
+  date_in_past: "That date has already been.",
+  beyond_advance_window: "That is more than two months ahead — bookings do not open that far out.",
+  not_an_operating_day: "The bus does not run that day.",
+  service_closed: "We are closed that day.",
+  journey_cancelled: "That journey has been stood down. Do not book onto it.",
+  unavailable: "That journey is not taking bookings.",
+  boarding_in_setdown_only_section:
+    "Coming home, past Lochcarron the bus can set people down but cannot pick them up. " +
+    "Pick a place before Lochcarron, or the outward journey instead.",
+  override_needs_a_reason:
+    "Write down why you are using seat 13 or 14. Somebody will be asked about it one day.",
+  full_but_override_possible:
+    "The bus is full at twelve on the busiest part of that journey — but seats 13 and 14 exist.",
+  no_room_on_the_busiest_section:
+    "There is genuinely no room on the busiest part of that journey, even with seats 13 and 14.",
+  booking_not_found: "That booking is not there any more — reload the day.",
+  booking_is_not_confirmed: "That booking is already cancelled.",
+  party_size_must_be_at_least_one:
+    "A booking has to be for at least one person. To take it to nobody, cancel it.",
+  your_sign_in_has_run_out: "Your sign-in has run out. Please sign in again.",
+  not_signed_in: "Please sign in.",
+  invalid_channel: "Something is wrong with this screen — tell whoever set it up.",
+  no_auto_contact_needs_acknowledgement:
+    "We have no mobile and no email for this passenger, so if the bus is ever stood down " +
+    "NOTHING will reach them automatically — somebody will have to ring. That is allowed, " +
+    "and it is normal on this route. Say so below and press the button again."
+};
+function say(err){
+  const code = (err && err.code) || String((err && err.message) || err);
+  if(SAY[code]) return SAY[code];
+  if(/^choose_a_stop_in/.test(code)){
+    return "That spot is inside a village, where the bus uses its stops. " +
+           "On the telephone you may still pin it if the caller genuinely needs the door — " +
+           "if this appeared, tell whoever set the screen up.";
+  }
+  if(/Bicycles are not carried/.test(code)) return code;
+  if(/duplicate key|already exists/i.test(code))
+    return "That looks like it has already been entered. Reload the day and check.";
+  return "It did not go through, and NOTHING has been booked. " +
+         "What the database said was: " + code;
+}
+
+/* ------------------------------------------------------------------
+   State
+------------------------------------------------------------------ */
+let CFG = null;                       // bus_page_config
+const DIR = {};                       // stops by direction
+let TAB = "day";
+const today = () => new Date().toISOString().slice(0, 10);
+
+const day = {date: today(), journeys: [], bookings: [], loading: false, message: null};
+const ring = {date: today(), rows: [], loaded: false};
+const people = {rows: [], loaded: false, message: null};
+
+const take = {
+  date: today(),
+  direction: "outward",
+  customer: null,        // chosen from the search
+  search: "", results: null, searching: false,
+  newName: "", homeArea: "",
+  mobile: "", landline: "", email: "",
+  party: 1,
+  pickupId: "", destId: "",
+  pin: null,             // {lat, lng, order, text} when picking up off-list
+  pinMode: false,
+  reqs: {},
+  otherPassengers: "",
+  note: "",
+  override: false, overrideReason: "",
+  ackNoMessages: false, ackNeeded: false,
+  busy: false, error: null, done: null
+};
+
+/* Bicycles are deliberately absent. The database refuses them (migration
+   0017) and offering a tick box that always fails would be worse than
+   not offering it at all. The crib note tells staff what to say. */
+const REQS = [
+  {k: "walking_aid",        l: "Walking stick or frame"},
+  {k: "folding_wheelchair", l: "Folding wheelchair", d: "Prior arrangement. Not accessible; they must be able to board."},
+  {k: "pushchair",          l: "Pushchair"},
+  {k: "large_luggage",      l: "Large or unusual luggage", d: "May need the trailer."},
+  {k: "dog",                l: "Dog", d: "We try, but cannot promise if another passenger objects."},
+  {k: "other",              l: "Something else"}
+];
+
+function wording(k, d){ return (CFG && CFG.wording && CFG.wording[k]) || d || ""; }
+
+/* ------------------------------------------------------------------
+   Stops, and where a pin falls along the road
+------------------------------------------------------------------ */
+const R_EARTH = 6371000;
+function havM(a, b){
+  const dLat = (b[1] - a[1]) * Math.PI / 180, dLng = (b[0] - a[0]) * Math.PI / 180;
+  const la1 = a[1] * Math.PI / 180, la2 = b[1] * Math.PI / 180;
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(la1) * Math.cos(la2) * Math.sin(dLng / 2) ** 2;
+  return 2 * R_EARTH * Math.asin(Math.sqrt(h));
+}
+const ROUTELINE = {};
+function routeFor(dir){
+  if(ROUTELINE[dir]) return ROUTELINE[dir];
+  const gj = (CFG.routes || {})[dir];
+  const coords = gj && gj.geometry && gj.geometry.coordinates;
+  if(!coords || coords.length < 2) return null;
+  const cum = [0];
+  for(let i = 1; i < coords.length; i++) cum.push(cum[i - 1] + havM(coords[i - 1], coords[i]));
+  const line = {coords, cum, stopAlong: {}};
+  (DIR[dir] ? DIR[dir] : []).forEach(s => {
+    line.stopAlong[s.n] = projectToLine(line, [s.lng, s.lat]).along;
+  });
+  ROUTELINE[dir] = line;
+  return line;
+}
+function projectToLine(line, p){
+  const {coords, cum} = line;
+  const cosLat = Math.cos(p[1] * Math.PI / 180);
+  const M = Math.PI / 180 * R_EARTH;
+  const px = p[0] * cosLat * M, py = p[1] * M;
+  let best = {off: Infinity, along: 0, point: coords[0]};
+  for(let i = 0; i < coords.length - 1; i++){
+    const a = coords[i], b = coords[i + 1];
+    const ax = a[0] * cosLat * M, ay = a[1] * M, bx = b[0] * cosLat * M, by = b[1] * M;
+    const dx = bx - ax, dy = by - ay;
+    const L2 = dx * dx + dy * dy;
+    let t = L2 ? ((px - ax) * dx + (py - ay) * dy) / L2 : 0;
+    t = Math.max(0, Math.min(1, t));
+    const qx = ax + t * dx, qy = ay + t * dy;
+    const off = Math.hypot(px - qx, py - qy);
+    if(off < best.off){
+      best = {off, along: cum[i] + t * (cum[i + 1] - cum[i]),
+              point: [qx / (cosLat * M), qy / M]};
+    }
+  }
+  return best;
+}
+function describeAlong(dir, along){
+  const line = routeFor(dir), stops = DIR[dir] || [];
+  const withAlong = stops.map(s => ({s, at: line.stopAlong[s.n]}))
+                         .filter(x => x.at !== undefined).sort((a, b) => a.at - b.at);
+  if(!withAlong.length) return {order: 1, text: "On the route"};
+  for(const x of withAlong){
+    if(Math.abs(x.at - along) <= 400) return {snapped: x.s, order: x.s.o, text: "At " + x.s.n};
+  }
+  if(along <= withAlong[0].at)
+    return {snapped: withAlong[0].s, order: withAlong[0].s.o, text: "At " + withAlong[0].s.n};
+  const last = withAlong[withAlong.length - 1];
+  if(along >= last.at) return {snapped: last.s, order: last.s.o, text: "At " + last.s.n};
+  let from = withAlong[0], to = last;
+  for(let i = 0; i < withAlong.length - 1; i++){
+    if(along >= withAlong[i].at && along <= withAlong[i + 1].at){
+      from = withAlong[i]; to = withAlong[i + 1]; break;
+    }
+  }
+  const frac = (along - from.at) / ((to.at - from.at) || 1);
+  const miles = Math.round(((along - from.at) / 1609.34) * 10) / 10;
+  return {
+    snapped: null,
+    order: from.s.o + frac * (to.s.o - from.s.o),
+    text: "Between " + from.s.n + " and " + to.s.n + " — about " +
+          miles + (miles === 1 ? " mile" : " miles") + " past " + from.s.n
+  };
+}
+
+function localTimes(dir){
+  const raw = wording(dir === "return" ? "local_point_times_return" : "local_point_times_outward", "");
+  const out = {};
+  raw.split(";").forEach(part => {
+    const m = part.split("=");
+    if(m.length === 2) out[m[0].trim()] = m[1].trim();
+  });
+  return out;
+}
+async function loadDirection(dir){
+  if(DIR[dir]) return DIR[dir];
+  const stops = await rpc("bus_stops", {p_direction: dir});
+  const printed = {};
+  ((CFG.timetable || {})[dir] || []).forEach(t => { printed[t.name] = t; });
+  const times = localTimes(dir);
+  DIR[dir] = stops.map(s => ({
+    id: s.id, n: s.name, o: Number(s.route_order),
+    lat: Number(s.latitude), lng: Number(s.longitude),
+    local: s.point_type === "approved",
+    t: (printed[s.name] && printed[s.name].time) || times[s.name] || null
+  })).sort((a, b) => a.o - b.o);
+  return DIR[dir];
+}
+
+/* ------------------------------------------------------------------
+   Rendering
+------------------------------------------------------------------ */
+const esc = s => String(s == null ? "" : s)
+  .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+const el = id => document.getElementById(id);
+const M = () => el("main");
+
+function niceDate(d){
+  try{
+    return new Date(d + "T12:00:00").toLocaleDateString("en-GB",
+      {weekday: "long", day: "numeric", month: "long"});
+  }catch(_){ return d; }
+}
+
+function render(){
+  if(!SESSION){ return renderSignIn(); }
+  if(ME && !ME.active) return renderNoAccess();
+  el("tabs").classList.remove("hidden");
+  el("signout").classList.remove("hidden");
+  el("who").textContent = ME ? (ME.name || ME.email || "") : "";
+  Array.from(el("tabs").children).forEach(b => {
+    b.setAttribute("aria-selected", String(b.dataset.tab === TAB));
+  });
+  const peopleTab = el("tabs").querySelector('[data-tab="people"]');
+  peopleTab.classList.toggle("hidden", !(ME && ME.is_bus_administrator));
+
+  if(TAB === "day") return renderDay();
+  if(TAB === "take") return renderTake();
+  if(TAB === "ring") return renderRing();
+  if(TAB === "people") return renderPeople();
+}
+
+function renderSignIn(){
+  el("tabs").classList.add("hidden");
+  el("signout").classList.add("hidden");
+  el("who").textContent = "";
+  M().innerHTML =
+    '<div class="card">' +
+      '<h2>Sign in</h2>' +
+      '<p class="muted">This screen is for the garage. Customers book on ' +
+        '<a href="./">the public page</a>.</p>' +
+      '<div id="signin-error"></div>' +
+      '<label for="em">Email address</label>' +
+      '<input id="em" type="email" autocomplete="username" inputmode="email">' +
+      '<label for="pw">Password</label>' +
+      '<input id="pw" type="password" autocomplete="current-password">' +
+      '<p></p><button class="btn wide" id="go">Sign in</button>' +
+    '</div>';
+  const go = async () => {
+    const b = el("go");
+    b.disabled = true; b.textContent = "Signing in…";
+    try{
+      await signIn(el("em").value.trim(), el("pw").value);
+      await afterSignIn();
+    }catch(e){
+      el("signin-error").innerHTML = '<div class="bad">' +
+        esc(/Invalid login/i.test(e.message) ?
+          "That email address and password do not match an account." : e.message) + '</div>';
+      b.disabled = false; b.textContent = "Sign in";
+    }
+  };
+  el("go").onclick = go;
+  el("pw").onkeydown = e => { if(e.key === "Enter") go(); };
+}
+
+function renderNoAccess(){
+  el("tabs").classList.add("hidden");
+  M().innerHTML =
+    '<div class="card"><h2>Your account is not set up yet</h2>' +
+    '<p>You have signed in, but nobody has said what you are allowed to do, so this screen ' +
+    'is empty on purpose.</p>' +
+    '<p class="muted">Ask Duncan to add ' + esc(ME.email || "your email address") +
+    ' on the "Who can use this" screen. It takes him about ten seconds and you will not ' +
+    'need a new password.</p></div>';
+}
+
+/* ---------------------------- The day ---------------------------- */
+function renderDay(){
+  const j = day.journeys;
+  let html =
+    '<div class="card">' +
+      '<label for="dd">Which day</label>' +
+      '<div class="row">' +
+        '<input id="dd" type="date" value="' + esc(day.date) + '">' +
+        '<button class="btn secondary" id="dtoday">Today</button>' +
+        '<button class="btn secondary" id="dnext">Next day →</button>' +
+      '</div>' +
+      '<p class="muted" style="margin:.6rem 0 0">' + esc(niceDate(day.date)) + '</p>' +
+    '</div>';
+
+  if(day.loading){ html += '<div class="card">Loading the day…</div>'; }
+  else if(day.message){ html += '<div class="card"><div class="bad">' + esc(day.message) + '</div></div>'; }
+  else if(!j.length){
+    html += '<div class="card"><p>Nothing is running that day, and nothing is booked.</p>' +
+            '<p class="muted">A journey appears here as soon as the first person is booked onto it.</p></div>';
+  }else{
+    j.forEach(row => {
+      const bks = day.bookings.filter(b => b.direction === row.direction);
+      const left = Number(row.seats_left_public);
+      const cls = left <= 0 ? "none" : (left <= 2 ? "low" : "");
+      html += '<div class="journey">' +
+        '<div class="head">' +
+          '<strong>' + (row.direction === "outward" ? "To Inverness" : "Home from Inverness") + '</strong>' +
+          '<span class="seats ' + cls + '">' + left + '</span>' +
+          '<span class="muted">' + (left === 1 ? "seat left" : "seats left") +
+            ' of twelve' + (Number(row.seats_left_max) > left ?
+              ' &middot; ' + Number(row.seats_left_max) + ' with 13 and 14' : '') + '</span>' +
+        '</div>' +
+        '<div class="chips">' +
+          '<span class="chip">' + row.bookings + ' booking' + (Number(row.bookings) === 1 ? '' : 's') +
+            ', ' + row.people + ' travelling</span>' +
+          (row.journey_status && row.journey_status !== "planned" && row.journey_status !== "confirmed"
+            ? '<span class="chip warn">' + esc(row.journey_status) + '</span>' : '') +
+          (Number(row.needs_telephoning) > 0
+            ? '<span class="chip tel">' + row.needs_telephoning + ' to telephone</span>' : '') +
+          (Number(row.overrides) > 0
+            ? '<span class="chip warn">' + row.overrides + ' on seat 13/14</span>' : '') +
+          (row.bookable_office !== "ok"
+            ? '<span class="chip warn">office: ' + esc(row.bookable_office) + '</span>' : '') +
+        '</div>';
+
+      if(!bks.length){
+        html += '<p class="muted" style="margin:.7rem 0 0">Nobody booked yet.</p>';
+      }
+      bks.forEach(b => {
+        html += '<div class="bk" data-id="' + esc(b.booking_id) + '">' +
+          '<div class="main">' +
+            '<div><strong>' + esc(b.lead_name) + '</strong> · ' + b.party_size +
+              (Number(b.party_size) === 1 ? " person" : " people") +
+              (b.telephone_only ? ' <span class="chip tel">telephone only</span>' : '') +
+              (b.is_override ? ' <span class="chip warn">seat 13/14</span>' : '') + '</div>' +
+            '<div class="where">' + esc(b.pickup) + ' → ' + esc(b.destination) +
+              (b.estimated_time ? ' · due ' + esc(String(b.estimated_time).slice(0, 5)) : '') + '</div>' +
+            '<div class="ref">' + esc(b.reference) +
+              (b.contact ? ' · ' + esc(b.contact) : '') + '</div>' +
+            (b.requirements ? '<div class="where">Needs: ' + esc(b.requirements) + '</div>' : '') +
+            (b.override_reason ? '<div class="where">Seat 13/14 because: ' + esc(b.override_reason) + '</div>' : '') +
+            (b.notes ? '<div class="where">Note: ' + esc(b.notes) + '</div>' : '') +
+          '</div>' +
+          '<div class="acts">' +
+            '<button class="btn secondary small" data-act="party">Change number</button>' +
+            '<button class="btn danger small" data-act="cancel">Cancel</button>' +
+          '</div>' +
+        '</div>';
+      });
+      html += '</div>';
+    });
+  }
+  M().innerHTML = html;
+
+  el("dd").onchange = e => { day.date = e.target.value; loadDay(); };
+  el("dtoday").onclick = () => { day.date = today(); loadDay(); };
+  el("dnext").onclick = () => {
+    const d = new Date(day.date + "T12:00:00");
+    d.setDate(d.getDate() + 1);
+    day.date = d.toISOString().slice(0, 10);
+    loadDay();
+  };
+  M().querySelectorAll(".bk .acts button").forEach(btn => {
+    btn.onclick = () => {
+      const id = btn.closest(".bk").dataset.id;
+      const b = day.bookings.find(x => x.booking_id === id);
+      if(btn.dataset.act === "cancel") return doCancel(b);
+      return doParty(b);
+    };
+  });
+}
+
+async function loadDay(){
+  day.loading = true; day.message = null; render();
+  try{
+    const [j, b] = await Promise.all([
+      rpc("bus_staff_day", {p_service_date: day.date}),
+      rpc("bus_staff_day_bookings", {p_service_date: day.date})
+    ]);
+    day.journeys = j || []; day.bookings = b || [];
+  }catch(e){
+    day.journeys = []; day.bookings = []; day.message = say(e);
+  }
+  day.loading = false; render();
+}
+
+async function doCancel(b){
+  const why = window.prompt(
+    "Cancelling " + b.reference + " for " + b.lead_name + ".\n\n" +
+    "Why? (the caller rang, they are not well, and so on)", "The customer rang to cancel");
+  if(why === null) return;
+  try{
+    const r = await rpc("bus_staff_cancel_booking", {p_booking_id: b.booking_id, p_reason: why});
+    await loadDay();
+    window.alert(r && r.already_cancelled
+      ? b.reference + " was already cancelled — nothing has changed."
+      : b.reference + " is cancelled. The seat is free again.");
+  }catch(e){ window.alert(say(e)); }
+}
+
+async function doParty(b){
+  const raw = window.prompt(
+    "How many are travelling on " + b.reference + " now?\n\n" +
+    "(It is " + b.party_size + " at the moment. Companions count as passengers.)",
+    String(b.party_size));
+  if(raw === null) return;
+  const n = parseInt(raw, 10);
+  if(!(n >= 1)) return window.alert("That has to be a number, one or more.");
+  try{
+    await rpc("bus_staff_change_party_size",
+      {p_booking_id: b.booking_id, p_new_size: n, p_override: false, p_override_reason: null});
+    await loadDay();
+  }catch(e){
+    if((e.code || "") === "full_but_override_possible"){
+      const why = window.prompt(
+        SAY.full_but_override_possible + "\n\n" + wording("office_override_wording", "") +
+        "\n\nWhy are you using one?", "");
+      if(!why) return;
+      try{
+        await rpc("bus_staff_change_party_size",
+          {p_booking_id: b.booking_id, p_new_size: n, p_override: true, p_override_reason: why});
+        await loadDay();
+      }catch(e2){ window.alert(say(e2)); }
+      return;
+    }
+    window.alert(say(e));
+  }
+}
+
+/* ------------------------ Take a booking ------------------------ */
+function stopOptions(dir, selectedId, minOrder){
+  const stops = (DIR[dir] || []).filter(s => minOrder == null || s.o > minOrder);
+  return '<option value="">— choose —</option>' + stops.map(s =>
+    '<option value="' + esc(s.id) + '"' + (s.id === selectedId ? " selected" : "") + '>' +
+      esc(s.n) + (s.t ? " · " + esc(s.t) : "") + (s.local ? " (local)" : "") +
+    '</option>').join("");
+}
+
+function renderTake(){
+  if(take.done){
+    const d = take.done;
+    M().innerHTML = '<div class="card">' +
+      '<div class="good"><strong>Booked.</strong> The reference is <strong>' + esc(d.reference) +
+      '</strong> — read it out and ask them to write it down.</div>' +
+      (d.telephone_only
+        ? '<div class="note">We have no mobile or email for them, so <strong>nothing will be ' +
+          'sent</strong>. If this run is ever stood down, somebody has to ring them. They are on ' +
+          'the "To telephone" list.</div>'
+        : '<div class="note">Text messages and emails are <strong>not switched on yet</strong>, so ' +
+          'nothing has been sent to them either way. Until they are, treat every booking as one ' +
+          'somebody may have to ring.</div>') +
+      (d.is_override ? '<div class="note">This one used seat 13 or 14.</div>' : '') +
+      '<button class="btn wide" id="another">Take another booking</button>' +
+      '<p></p><button class="btn secondary wide" id="seeday">See that day</button>' +
+      '</div>';
+    el("another").onclick = () => { resetTake(); render(); };
+    el("seeday").onclick = () => { day.date = take.date; TAB = "day"; resetTake(); loadDay(); };
+    return;
+  }
+
+  const stops = DIR[take.direction] || [];
+  const pickStop = stops.find(s => s.id === take.pickupId);
+  const pickOrder = take.pin ? take.pin.order : (pickStop ? pickStop.o : null);
+
+  let html = '<div class="card">' +
+    '<h2>Take a booking over the telephone</h2>' +
+
+    '<label for="td">Which day</label>' +
+    '<input id="td" type="date" value="' + esc(take.date) + '">' +
+    '<p class="muted" style="margin:.35rem 0 0">' + esc(niceDate(take.date)) + '</p>' +
+
+    '<h3>Which way</h3>' +
+    '<div class="pick">' +
+      '<button data-dir="outward" aria-pressed="' + (take.direction === "outward") + '">To Inverness</button>' +
+      '<button data-dir="return" aria-pressed="' + (take.direction === "return") + '">Home from Inverness</button>' +
+    '</div>' +
+
+    '<h3>Who is calling</h3>';
+
+  if(take.customer){
+    html += '<div class="good"><strong>' + esc(take.customer.display_name) + '</strong>' +
+      (take.customer.home_area ? ' · ' + esc(take.customer.home_area) : '') +
+      (take.customer.contacts ? '<br><span class="muted">' + esc(take.customer.contacts) + '</span>' : '') +
+      (take.customer.blocked_online
+        ? '<br><span class="chip warn">must telephone: ' + esc(take.customer.block_reason || "") + '</span>' +
+          '<br><span class="muted">That is fine — this is the telephone.</span>'
+        : '') +
+      '</div>' +
+      '<button class="btn secondary small" id="clearcust">Somebody else</button>';
+  }else{
+    html += '<label for="q">Find them <span class="hint">Name, telephone number or an old booking reference. ' +
+      'Leave it blank if they are new.</span></label>' +
+      '<div class="row"><input id="q" value="' + esc(take.search) + '" placeholder="MacDonald, or 722997">' +
+      '<button class="btn secondary" id="find" style="flex:0 0 auto">' +
+        (take.searching ? "Looking…" : "Find") + '</button></div>';
+    if(take.results){
+      if(!take.results.length){
+        html += '<p class="muted">Nobody of that name or number. Fill the details in below and ' +
+                'they will be added.</p>';
+      }else{
+        html += '<div class="results">' + take.results.map((r, i) =>
+          '<button data-i="' + i + '"><strong>' + esc(r.display_name) + '</strong>' +
+          '<span class="sub">' + esc(r.home_area || "area not recorded") +
+          (r.last_travelled ? " · last travelled " + esc(r.last_travelled) : " · never travelled") +
+          (r.contacts ? " · " + esc(r.contacts) : "") + '</span></button>').join("") + '</div>';
+      }
+    }
+    html +=
+      '<label for="nm">Name for the booking</label>' +
+      '<input id="nm" value="' + esc(take.newName) + '" placeholder="Mrs Mary MacDonald">' +
+      '<label for="ha">Which village <span class="hint">Helps tell two people of the same name apart.</span></label>' +
+      '<input id="ha" value="' + esc(take.homeArea) + '" placeholder="Lochcarron">' +
+      '<div class="row">' +
+        '<div><label for="mob">Mobile</label><input id="mob" inputmode="tel" value="' + esc(take.mobile) + '"></div>' +
+        '<div><label for="ll">Landline</label><input id="ll" inputmode="tel" value="' + esc(take.landline) + '"></div>' +
+      '</div>' +
+      '<label for="em2">Email <span class="hint">Only if they offer it.</span></label>' +
+      '<input id="em2" type="email" value="' + esc(take.email) + '">' +
+      '<div class="note">A landline on its own is enough here. That is the whole point of the ' +
+      'telephone: there is a person who can ring back.</div>';
+  }
+
+  html += '<h3>The journey</h3>' +
+    '<label for="pt">How many travelling <span class="hint">Count everybody, including anyone ' +
+      'coming along to help.</span></label>' +
+    '<input id="pt" type="number" min="1" max="14" value="' + esc(take.party) + '">' +
+
+    '<label for="pu">Picking up at</label>';
+
+  if(take.pin){
+    html += '<div class="good">' + esc(take.pin.text) + '<br>' +
+      '<span class="muted">A place on the road, not one of our stops.</span></div>' +
+      '<button class="btn secondary small" id="clearpin">Choose a stop instead</button>';
+  }else{
+    html += '<select id="pu">' + stopOptions(take.direction, take.pickupId, null) + '</select>' +
+      '<p></p><button class="btn secondary small" id="usepin">' +
+        (take.pinMode ? "Hide the map" : "Somewhere else on the road…") + '</button>';
+    if(take.pinMode){
+      html += '<div class="note">Tap the road where the bus should stop. Staff are not held to ' +
+        'the village rule the website follows — if somebody genuinely cannot get to a stop, ' +
+        'you may pin their door. The bus still does not leave the route.</div>' +
+        '<div class="mapholder"><div id="staffmap"></div></div>';
+    }
+  }
+
+  html += '<label for="de">Setting down at</label>' +
+    '<select id="de">' + stopOptions(take.direction, take.destId, pickOrder) + '</select>' +
+    (pickOrder == null ? '<p class="muted">Choose the pick-up first.</p>' : '') +
+
+    '<h3>Anything to carry</h3>' +
+    '<div class="checks">' + REQS.map(r =>
+      '<label><input type="checkbox" data-req="' + r.k + '"' + (take.reqs[r.k] ? " checked" : "") + '>' +
+      '<span><strong>' + esc(r.l) + '</strong>' +
+      (r.d ? '<br><span class="muted">' + esc(r.d) + '</span>' : '') + '</span></label>').join("") +
+    '</div>' +
+    '<div class="note">' + esc(wording("office_crib_bicycles",
+      "Bicycles are not carried on Service 704.")) + '</div>' +
+
+    '<label for="op">Anyone else travelling, by name <span class="hint">One per line. ' +
+      'Optional — it just helps the driver.</span></label>' +
+    '<textarea id="op" placeholder="John MacDonald">' + esc(take.otherPassengers) + '</textarea>' +
+
+    '<label for="nt">Note for the driver <span class="hint">Anything they should know: ' +
+      '"waits inside the shop", "green gate past the bridge".</span></label>' +
+    '<textarea id="nt">' + esc(take.note) + '</textarea>';
+
+  if(take.ackNeeded){
+    html += '<div class="note"><strong>No message will reach this passenger.</strong><br>' +
+      'They have given us a landline only, so no text and no email can be sent to them. ' +
+      'If this run is ever stood down, somebody in the office has to ring them. They will ' +
+      'appear on the "To telephone" list.</div>' +
+      '<div class="checks"><label><input type="checkbox" id="ack"' +
+      (take.ackNoMessages ? " checked" : "") + '>' +
+      '<span><strong>I understand — take the booking anyway</strong></span></label></div>';
+  }
+
+  if(take.override){
+    html += '<div class="note"><strong>' + SAY.full_but_override_possible + '</strong><br>' +
+      esc(wording("office_override_wording", "")) + '</div>' +
+      '<label for="ow">Why seat 13 or 14</label>' +
+      '<input id="ow" value="' + esc(take.overrideReason) + '" placeholder="Hospital appointment, no other way in">';
+  }
+
+  if(take.error) html += '<div class="bad">' + esc(take.error) + '</div>';
+
+  html += '<p></p><button class="btn wide" id="submit"' + (take.busy ? " disabled" : "") + '>' +
+    (take.busy ? "Taking it…" : (take.override ? "Take it on seat 13 or 14" : "Take the booking")) +
+    '</button>' +
+    '<p class="muted" style="margin-top:.6rem">Read the conditions to them as you go: no alcohol ' +
+    'or smoking, the bus is not wheelchair accessible, and times are estimates on a single-track ' +
+    'road.</p>' +
+    '</div>';
+
+  M().innerHTML = html;
+  wireTake();
+  if(take.pinMode && !take.pin) mountStaffMap();
+}
+
+function wireTake(){
+  const keep = () => {
+    if(el("td")) take.date = el("td").value;
+    if(el("q")) take.search = el("q").value;
+    if(el("nm")) take.newName = el("nm").value;
+    if(el("ha")) take.homeArea = el("ha").value;
+    if(el("mob")) take.mobile = el("mob").value;
+    if(el("ll")) take.landline = el("ll").value;
+    if(el("em2")) take.email = el("em2").value;
+    if(el("pt")) take.party = Math.max(1, parseInt(el("pt").value, 10) || 1);
+    if(el("pu")) take.pickupId = el("pu").value;
+    if(el("de")) take.destId = el("de").value;
+    if(el("op")) take.otherPassengers = el("op").value;
+    if(el("nt")) take.note = el("nt").value;
+    if(el("ow")) take.overrideReason = el("ow").value;
+  };
+  M().querySelectorAll("input,select,textarea").forEach(i => { i.onchange = keep; i.oninput = keep; });
+
+  M().querySelectorAll(".pick button").forEach(b => {
+    b.onclick = async () => {
+      keep();
+      take.direction = b.dataset.dir;
+      take.pickupId = ""; take.destId = ""; take.pin = null;
+      await loadDirection(take.direction);
+      render();
+    };
+  });
+  if(el("pu")) el("pu").onchange = () => { keep(); render(); };
+  if(el("find")) el("find").onclick = () => { keep(); doFind(); };
+  if(el("q")) el("q").onkeydown = e => { if(e.key === "Enter"){ e.preventDefault(); keep(); doFind(); } };
+  if(el("clearcust")) el("clearcust").onclick = () => {
+    take.customer = null; take.results = null; render();
+  };
+  M().querySelectorAll(".results button").forEach(b => {
+    b.onclick = () => {
+      take.customer = take.results[Number(b.dataset.i)];
+      take.newName = take.customer.display_name;
+      render();
+    };
+  });
+  if(el("usepin")) el("usepin").onclick = () => { keep(); take.pinMode = !take.pinMode; render(); };
+  if(el("clearpin")) el("clearpin").onclick = () => {
+    take.pin = null; take.pinMode = false; render();
+  };
+  if(el("ack")) el("ack").onchange = () => { take.ackNoMessages = el("ack").checked; };
+  M().querySelectorAll("[data-req]").forEach(c => {
+    c.onchange = () => { take.reqs[c.dataset.req] = c.checked; };
+  });
+  el("submit").onclick = () => { keep(); doTake(); };
+}
+
+async function doFind(){
+  if(!take.search.trim()){ take.results = []; return render(); }
+  take.searching = true; render();
+  try{
+    take.results = await rpc("bus_staff_find_customer", {p_query: take.search.trim()});
+  }catch(e){
+    take.results = []; take.error = say(e);
+  }
+  take.searching = false; render();
+}
+
+/* One map, kept alive, exactly as the public page does it — a rebuilt
+   map throws away the zoom and flies back out to the whole route, which
+   is maddening when you are trying to find one house. */
+let SMAPEL = null, SMAP = null, SMARKER = null, SMAPDIR = null;
+function mountStaffMap(){
+  const slot = el("staffmap");
+  if(!slot) return;
+  if(!SMAPEL){
+    SMAPEL = document.createElement("div");
+    SMAPEL.style.cssText = "height:100%;width:100%";
+    slot.appendChild(SMAPEL);
+    SMAP = new maplibregl.Map({
+      container: SMAPEL,
+      style: {version: 8,
+        sources: {osm: {type: "raster", tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
+          tileSize: 256, attribution: "© OpenStreetMap contributors"}},
+        layers: [{id: "osm", type: "raster", source: "osm"}]},
+      center: [-5.0, 57.5], zoom: 7
+    });
+    SMAP.addControl(new maplibregl.NavigationControl({showCompass: false}));
+    SMAP.on("load", () => {
+      SMAP.addSource("route", {type: "geojson", data: {type: "FeatureCollection", features: []}});
+      SMAP.addLayer({id: "route", type: "line", source: "route",
+        paint: {"line-color": "#1f5f8b", "line-width": 4, "line-opacity": .85}});
+      syncStaffMap(true);
+    });
+    SMAP.on("click", e => {
+      const line = routeFor(take.direction);
+      if(!line) return;
+      const p = projectToLine(line, [e.lngLat.lng, e.lngLat.lat]);
+      const info = describeAlong(take.direction, p.along);
+      if(info.snapped){
+        take.pin = null;
+        take.pickupId = info.snapped.id;
+        take.pinMode = false;
+      }else{
+        take.pin = {lat: p.point[1], lng: p.point[0], order: info.order, text: info.text};
+        take.pickupId = "";
+      }
+      render();
+    });
+  }else{
+    slot.appendChild(SMAPEL);
+    SMAP.resize();
+  }
+  syncStaffMap(false);
+}
+function syncStaffMap(force){
+  if(!SMAP || !SMAP.getSource("route")) return;
+  const gj = (CFG.routes || {})[take.direction];
+  const coords = gj && gj.geometry && gj.geometry.coordinates;
+  SMAP.getSource("route").setData(coords
+    ? {type: "Feature", geometry: {type: "LineString", coordinates: coords}}
+    : {type: "FeatureCollection", features: []});
+  if(coords && (force || SMAPDIR !== take.direction)){
+    const b = new maplibregl.LngLatBounds();
+    coords.forEach(c => b.extend(c));
+    SMAP.fitBounds(b, {padding: 30, duration: 0});
+    SMAPDIR = take.direction;
+  }
+  if(take.pin){
+    if(!SMARKER) SMARKER = new maplibregl.Marker({color: "#a3241c"}).setLngLat([take.pin.lng, take.pin.lat]).addTo(SMAP);
+    else SMARKER.setLngLat([take.pin.lng, take.pin.lat]);
+  }else if(SMARKER){ SMARKER.remove(); SMARKER = null; }
+}
+
+async function doTake(){
+  take.error = null;
+  const stops = DIR[take.direction] || [];
+  const pickStop = stops.find(s => s.id === take.pickupId);
+  const destStop = stops.find(s => s.id === take.destId);
+
+  if(!take.pin && !pickStop) return fail("Choose where the bus is picking them up.");
+  if(!destStop) return fail("Choose where they are getting off.");
+  const boardOrder = take.pin ? take.pin.order : pickStop.o;
+  if(destStop.o <= boardOrder) return fail(SAY.invalid_journey_span);
+  const name = (take.customer ? take.customer.display_name : take.newName).trim();
+  if(name.length < 2) return fail(SAY.lead_passenger_name_required);
+  if(!take.customer && !take.mobile.trim() && !take.landline.trim() && !take.email.trim())
+    return fail(SAY.some_way_to_reach_them_required);
+  if(take.override && !take.overrideReason.trim()) return fail(SAY.override_needs_a_reason);
+
+  const payload = {
+    service_date: take.date,
+    direction: take.direction,
+    lead_passenger_name: name,
+    party_size: take.party,
+    board_route_order: boardOrder,
+    alight_route_order: destStop.o,
+    destination_point_id: destStop.id,
+    channel: "phone",
+    customer_id: take.customer ? take.customer.customer_id : null,
+    mobile: take.mobile.trim() || null,
+    landline: take.landline.trim() || null,
+    email: take.email.trim() || null,
+    home_area: take.homeArea.trim() || null,
+    note: take.note.trim() || null,
+    other_passengers: take.otherPassengers.split("\n").map(s => s.trim()).filter(Boolean),
+    requirements: REQS.filter(r => take.reqs[r.k]).map(r => ({type: r.k})),
+    override: take.override,
+    override_reason: take.override ? take.overrideReason.trim() : null,
+    confirm_no_notification: take.ackNoMessages
+  };
+  if(take.pin){
+    payload.pickup_latitude = take.pin.lat;
+    payload.pickup_longitude = take.pin.lng;
+    payload.pickup_description = take.pin.text;
+  }else{
+    payload.pickup_point_id = pickStop.id;
+  }
+
+  take.busy = true; render();
+  try{
+    const r = await rpc("bus_staff_create_booking", {p_payload: payload});
+    take.busy = false;
+    take.done = r;
+    render();
+  }catch(e){
+    take.busy = false;
+    if((e.code || "") === "no_auto_contact_needs_acknowledgement"){
+      take.ackNeeded = true;
+      take.error = SAY.no_auto_contact_needs_acknowledgement;
+    }else if((e.code || "") === "full_but_override_possible" && !take.override){
+      take.override = true;
+      take.error = SAY.full_but_override_possible +
+        " If you are going to use one, say why and press the button again.";
+    }else{
+      take.error = say(e);
+    }
+    render();
+  }
+  function fail(m){ take.error = m; render(); }
+}
+
+function resetTake(){
+  const d = take.date, dir = take.direction;
+  Object.assign(take, {
+    date: d, direction: dir, customer: null, search: "", results: null, searching: false,
+    newName: "", homeArea: "", mobile: "", landline: "", email: "", party: 1,
+    pickupId: "", destId: "", pin: null, pinMode: false, reqs: {}, otherPassengers: "",
+    note: "", override: false, overrideReason: "",
+    ackNoMessages: false, ackNeeded: false, busy: false, error: null, done: null
+  });
+}
+
+/* --------------------------- To telephone --------------------------- */
+function renderRing(){
+  let html = '<div class="card">' +
+    '<h2>Who has to be telephoned</h2>' +
+    '<p class="muted">Everyone on this list has given us a landline and nothing else. If a run ' +
+    'is stood down, no text and no email reaches them — somebody has to ring. On the worst ' +
+    'morning of the year this is the screen that matters.</p>' +
+    '<label for="rd">Which day</label>' +
+    '<input id="rd" type="date" value="' + esc(ring.date) + '">' +
+    '</div>';
+
+  if(!ring.loaded){ html += '<div class="card">Loading…</div>'; }
+  else if(!ring.rows.length){
+    html += '<div class="card"><div class="good">Nobody. Everyone booked that day can be ' +
+            'reached by text or email.</div></div>';
+  }else{
+    html += '<div class="card"><table><thead><tr>' +
+      '<th>Who</th><th>Telephone</th><th>Where</th><th>Due</th></tr></thead><tbody>' +
+      ring.rows.map(r =>
+        '<tr><td><strong>' + esc(r.lead_name) + '</strong><br>' +
+        '<span class="muted">' + esc(r.reference) + ' · ' + r.party_size +
+        (Number(r.party_size) === 1 ? " person" : " people") + ' · ' +
+        (r.direction === "outward" ? "to Inverness" : "home") + '</span></td>' +
+        '<td>' + (r.telephone
+          ? '<a href="tel:' + esc(String(r.telephone).replace(/\s/g, "")) + '">' + esc(r.telephone) + '</a>'
+          : '<span class="chip tel">no number!</span>') + '</td>' +
+        '<td>' + esc(r.pickup) + '</td>' +
+        '<td>' + esc(r.estimated ? String(r.estimated).slice(0, 5) : "—") + '</td></tr>').join("") +
+      '</tbody></table></div>';
+  }
+  M().innerHTML = html;
+  el("rd").onchange = e => { ring.date = e.target.value; loadRing(); };
+}
+async function loadRing(){
+  ring.loaded = false; render();
+  try{ ring.rows = await rpc("bus_staff_call_list", {p_service_date: ring.date}) || []; }
+  catch(e){ ring.rows = []; }
+  ring.loaded = true; render();
+}
+
+/* ------------------------ Who can use this ------------------------ */
+function renderPeople(){
+  let html = '<div class="card">' +
+    '<h2>Who can use this</h2>' +
+    '<p class="muted">Signing in does not by itself give anybody anything. A person can only ' +
+    'use the office screen if their email address is on this list and is allowed.</p>' +
+    '<h3>Add somebody</h3>' +
+    '<label for="pe">Their email address <span class="hint">The one they will sign in with. ' +
+      'It has to match exactly.</span></label>' +
+    '<input id="pe" type="email" placeholder="kay@example.com">' +
+    '<label for="pn">Their name</label><input id="pn" placeholder="Kay">' +
+    '<label for="pr">What they may do</label>' +
+    '<select id="pr">' +
+      '<option value="staff">Office — take, change and cancel bookings</option>' +
+      '<option value="read_only">Look only — see the day, change nothing</option>' +
+      '<option value="manager">Manager — everything except adding people</option>' +
+      '<option value="administrator">Administrator — everything, including this screen</option>' +
+    '</select>' +
+    '<p></p><button class="btn wide" id="padd">Add them</button>' +
+    '<div class="note">They still need a login. You make that in the Supabase dashboard: ' +
+    '<strong>Authentication → Users → Add user</strong>, with the same email address. Give them ' +
+    'the password face to face — never by text or email, and never write it in here.</div>';
+  if(people.message) html += '<div class="bad">' + esc(people.message) + '</div>';
+  html += '</div>';
+
+  if(people.loaded && people.rows.length){
+    html += '<div class="card"><table><thead><tr><th>Who</th><th>May do</th><th></th></tr></thead><tbody>' +
+      people.rows.map(r =>
+        '<tr><td><strong>' + esc(r.full_name || r.email) + '</strong><br>' +
+        '<span class="muted">' + esc(r.email) + '</span>' +
+        (r.has_signed_in ? '' : '<br><span class="chip warn">has never signed in</span>') +
+        (r.is_bus_administrator ? '<br><span class="chip">administrator</span>' : '') + '</td>' +
+        '<td>' + (r.is_allowed ? esc(r.portal_role) : '<span class="chip tel">no access</span>') + '</td>' +
+        '<td><button class="btn ' + (r.is_allowed ? "danger" : "secondary") + ' small" ' +
+          'data-email="' + esc(r.email) + '" data-allow="' + (!r.is_allowed) + '">' +
+          (r.is_allowed ? "Take access away" : "Let them in") + '</button></td></tr>').join("") +
+      '</tbody></table></div>';
+  }
+  M().innerHTML = html;
+
+  el("padd").onclick = async () => {
+    people.message = null;
+    try{
+      await rpc("bus_staff_set_invite", {
+        p_email: el("pe").value.trim(),
+        p_full_name: el("pn").value.trim() || null,
+        p_portal_role: el("pr").value,
+        p_is_allowed: true
+      });
+      await loadPeople();
+    }catch(e){ people.message = say(e); render(); }
+  };
+  M().querySelectorAll("[data-email]").forEach(b => {
+    b.onclick = async () => {
+      try{
+        await rpc("bus_staff_set_invite", {
+          p_email: b.dataset.email, p_is_allowed: b.dataset.allow === "true"});
+        await loadPeople();
+      }catch(e){ people.message = say(e); render(); }
+    };
+  });
+}
+async function loadPeople(){
+  try{ people.rows = await rpc("bus_staff_people", {}) || []; }
+  catch(e){ people.rows = []; people.message = say(e); }
+  people.loaded = true; render();
+}
+
+/* ------------------------------------------------------------------
+   Start
+------------------------------------------------------------------ */
+el("signout").onclick = () => { saveSession(null); ME = null; render(); };
+el("tabs").onclick = e => {
+  const b = e.target.closest("button[data-tab]");
+  if(!b) return;
+  TAB = b.dataset.tab;
+  if(TAB === "day") return loadDay();
+  if(TAB === "ring") return loadRing();
+  if(TAB === "people") return loadPeople();
+  render();
+};
+
+async function afterSignIn(){
+  M().innerHTML = '<div class="card">Just a moment…</div>';
+  try{
+    ME = await rpc("bus_staff_whoami", {});
+  }catch(e){
+    saveSession(null);
+    ME = null;
+    render();
+    return;
+  }
+  if(!ME.active){ render(); return; }
+  try{
+    CFG = await rpc("bus_page_config", {});
+    await loadDirection("outward");
+  }catch(e){
+    M().innerHTML = '<div class="card"><div class="bad">' + esc(say(e)) + '</div></div>';
+    return;
+  }
+  TAB = "day";
+  loadDay();
+}
+
+loadSession();
+if(SESSION) afterSignIn(); else render();
+</script>
+</body>
+</html>

@@ -1,10 +1,10 @@
 {
-  "cleanUrls": true,
-  "rewrites": [
-    { "source": "/bus", "destination": "/index.html" },
-    { "source": "/bus/:path*", "destination": "/index.html" }
-  ],
   "redirects": [
-    { "source": "/", "destination": "https://www.lochcarrongarage.co.uk/", "permanent": false }
+    { "source": "/", "destination": "https://www.lochcarrongarage.co.uk/", "permanent": false },
+    { "source": "/bus", "destination": "/bus/", "permanent": false }
+  ],
+  "rewrites": [
+    { "source": "/bus/", "destination": "/index.html" },
+    { "source": "/bus/:path*", "destination": "/:path*" }
   ]
 }

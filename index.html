@@ -796,7 +796,6 @@ const REQUIREMENTS = [
   {k: "walking_aid",   l: "Walking stick or frame", d: ""},
   {k: "pushchair",     l: "Pushchair",              d: ""},
   {k: "large_luggage", l: "Large or unusual luggage", d: "May need the trailer. We will be in touch if so."},
-  {k: "bicycle",       l: "Bicycle",                d: "May need the trailer. We will be in touch if so."},
   {k: "dog",           l: "Dog",                    d: "We will do our best, but we cannot promise if another passenger objects."},
   {k: "other",         l: "Something else",         d: ""}
 ];
@@ -805,7 +804,9 @@ function pickReqs(){
     "Leave it all blank if not. Nothing here is required.") + '<div id="r"></div>' +
     '<div class="note warn"><strong>Please note.</strong> The minibus is not wheelchair accessible. ' +
     'A folding wheelchair can be carried by prior arrangement if you are able to board safely. ' +
-    'Some luggage and bicycles need the trailer — we will telephone you if so.</div>' +
+    'Large or unusual luggage may need the trailer — we will telephone you if so. ' +
+    '<strong>Bicycles are not carried</strong>, as there is no way to secure one on this ' +
+    'vehicle without damaging it.</div>' +
     '<button class="primary" onclick="RNEXT()">Continue</button>' + backBtn() + '</div>');
   const box = c.querySelector("#r");
   REQUIREMENTS.forEach(r => {
