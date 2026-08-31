@@ -136,6 +136,8 @@ let QUEUE = recall(K.queue, []);
 let LIST = recall(K.list, null);
 let DONE = recall(K.done, {});     // stop id -> {verdict, metres, at}
 let DIRECTION = "outward";
+let MILES = recall("bus704.walk.miles", {});   // stop id -> what he typed, kept so a
+                                               // re-render mid-walk does not wipe it
 let BUSY = {};                     // stop id -> true while the phone is thinking
 let ERROR = "";
 let flushing = false;
@@ -217,6 +219,8 @@ async function flush(){
         DONE[item.args.p_pickup_point_id] = {
           verdict: res.verdict || "Recorded.",
           metres: res.metres_from_current,
+          miles: res.trip_miles,
+          milesWarning: res.miles_warning || null,
           at: item.at, sent: true
         };
         keep(K.done, DONE);
@@ -274,13 +278,22 @@ async function tap(stop){
   DONE[stop.id] = {verdict: "Saved on the phone. It will send when you have a signal.",
                    metres: null, at, sent: false};
   keep(K.done, DONE);
+  /* A blank box means "not doing miles", which is a perfectly good answer
+     and must never block the position being recorded. Anything that is not
+     a sensible number is treated the same way rather than being argued
+     about at a road end. */
+  const typed = (MILES[stop.id] || "").trim();
+  const miles = typed === "" ? null : Number(typed);
+  const goodMiles = miles !== null && isFinite(miles) && miles >= 0 && miles < 1000;
+
   enqueue("bus_stop_walk_record", {
     p_pickup_point_id: stop.id,
     p_latitude: pos.lat, p_longitude: pos.lng,
     p_accuracy_metres: pos.acc,
     p_note: null,
     p_occurred_at: at,
-    p_recorded_offline_at: navigator.onLine === false ? at : null
+    p_recorded_offline_at: navigator.onLine === false ? at : null,
+    p_trip_miles: goodMiles ? miles : null
   });
   render();
 }
@@ -356,6 +369,10 @@ function render(){
        'decides. So tap freely — you cannot break anything from here.</p>' +
        '<p class="muted">No signal is fine. Everything keeps on the phone and sends itself later, ' +
        'remembering the time you actually tapped.</p>' +
+       '<p><strong>Miles too, if you can.</strong> Zero the trip meter before you set off, and ' +
+       'type what it reads at each stop. That gives us the distance between every stop out of ' +
+       'the same run — including the Toscaig leg, which has never been counted. Leave it blank ' +
+       'if you would rather just do the stops.</p>' +
        '<div class="pick">' +
        '<button type="button" aria-pressed="' + (DIRECTION === "outward") + '" id="dout">Going out</button>' +
        '<button type="button" aria-pressed="' + (DIRECTION === "return") + '" id="dret">Coming home</button>' +
@@ -382,6 +399,11 @@ function render(){
       }
       if(Number(s.applied) > 0) h += '<span class="tag ok">Confirmed before</span>';
       if(Number(s.pending) > 0) h += '<span class="tag n">' + s.pending + ' waiting to be looked at</span>';
+      h += '<label for="m-' + s.id + '" style="margin-top:.4rem">Trip meter (leave blank if not doing miles)</label>' +
+           '<input id="m-' + s.id + '" type="text" inputmode="decimal" ' +
+           'placeholder="e.g. 11.8" value="' + esc(MILES[s.id] || "") + '" ' +
+           'data-miles="' + s.id + '">';
+      h += '<div style="height:.5rem"></div>';
       h += '<button class="btn' + (d ? ' secondary' : '') + '" data-id="' + s.id + '"' +
            (busy ? ' disabled' : '') + ' type="button">' +
            (busy ? 'Finding you…' : (d ? 'Record it again' : 'I am here')) + '</button>';
@@ -391,7 +413,11 @@ function render(){
         h += '<div class="verdict' + (good ? ' good' : (warn ? ' warn' : '')) + '">' +
              esc(d.verdict) +
              (d.sent === false ? '' : (d.metres != null ? ' (' + d.metres + ' m from what we hold)' : '')) +
+             (d.miles != null ? ' Trip meter ' + esc(d.miles) + '.' : '') +
              '</div>';
+        if(d.milesWarning){
+          h += '<div class="verdict warn">' + esc(d.milesWarning) + '</div>';
+        }
       }
       h += '</div>';
     });
@@ -402,6 +428,12 @@ function render(){
   el("dout").onclick = () => { DIRECTION = "outward"; load(); };
   el("dret").onclick = () => { DIRECTION = "return";  load(); };
   el("reload").onclick = load;
+  Array.prototype.forEach.call(m.querySelectorAll("input[data-miles]"), inp => {
+    inp.oninput = () => {
+      MILES[inp.getAttribute("data-miles")] = inp.value;
+      keep("bus704.walk.miles", MILES);
+    };
+  });
   Array.prototype.forEach.call(m.querySelectorAll("button[data-id]"), btn => {
     btn.onclick = () => {
       const s = (LIST || []).find(x => x.id === btn.getAttribute("data-id"));
@@ -413,6 +445,7 @@ function render(){
 el("out").onclick = () => {
   setSession(null); ME = null; LIST = null;
   forget(K.list);
+  MILES = {}; forget("bus704.walk.miles");
   render();
 };
 

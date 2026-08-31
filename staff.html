@@ -231,6 +231,60 @@ async function rpc(fn, args){
 /* ------------------------------------------------------------------
    Turning a database error into something to say on the telephone
 ------------------------------------------------------------------ */
+async function loadDays(){
+  try{
+    DAYS = await rpc("bus_staff_days", {}) || [];
+    /* The tabs want different days, and it is worth being deliberate.
+
+       THE DAY and WHO TO TELEPHONE want TODAY when the bus is running
+       today - that is the run in progress, the one somebody is asking
+       about, and on a snowy morning the telephone list for today is the
+       screen that matters. Only when today is not a running day do they
+       move to the next one.
+
+       TAKE A BOOKING wants the first day that can actually be BOOKED.
+       Opening it on today's run, when the deadline went at six o'clock
+       last night, invites somebody to fill in a whole form and be refused
+       at the end. */
+    const t0 = today();
+    const runningToday = DAYS.find(d => d.date === t0);
+    const nextRunning  = DAYS.find(d => d.date >= t0) || DAYS[DAYS.length - 1];
+    const firstOpen    = DAYS.find(d => d.bookable) || nextRunning;
+
+    if(!DAYS.some(d => d.date === day.date))  day.date  = (runningToday || nextRunning).date;
+    if(!DAYS.some(d => d.date === ring.date)) ring.date = (runningToday || nextRunning).date;
+    if(firstOpen) take.date = firstOpen.date;
+  }catch(e){ DAYS = []; }
+}
+
+/* A dropdown of running days. Falls back to a plain date box only if the
+   list could not be fetched - better a usable screen than a dead one. */
+function dayPicker(id, value){
+  if(!DAYS || !DAYS.length){
+    return '<input id="' + id + '" type="date" value="' + esc(value) + '">';
+  }
+  let h = '<select id="' + id + '">';
+  if(!DAYS.some(d => d.date === value)){
+    h += '<option value="' + esc(value) + '" selected>' + esc(niceDate(value)) + '</option>';
+  }
+  DAYS.forEach(d => {
+    const shut = d.status === 'deadline_passed' ? ' — booking closed'
+               : d.status === 'date_in_past'    ? ' — has been'
+               : d.status === 'journey_cancelled' ? ' — stood down'
+               : d.status === 'service_closed'  ? ' — not running'
+               : '';
+    const n = Number(d.booked) > 0 ? '  (' + d.booked + ' booked)' : '';
+    h += '<option value="' + esc(d.date) + '"' + (d.date === value ? ' selected' : '') + '>' +
+         esc(d.label) + esc(shut) + esc(n) + '</option>';
+  });
+  return h + '</select>';
+}
+
+function dayStatus(d){
+  const row = (DAYS || []).find(x => x.date === d);
+  return row ? row.status : null;
+}
+
 const SAY = {
   not_permitted_to_take_bookings:
     "Your account is not allowed to take bookings. Ask Duncan to give you access.",
@@ -303,6 +357,17 @@ let CFG = null;                       // bus_page_config
 const DIR = {};                       // stops by direction
 let TAB = "day";
 const today = () => new Date().toISOString().slice(0, 10);
+
+/* THE DAYS THE BUS RUNS.
+   Fetched once and shared by all three tabs. The operator's point, on first
+   real use: a free date box will take any day of the year, so a member of
+   staff with a caller waiting can pick a Tuesday and have to start again.
+   A list that only contains running days cannot be got wrong. It comes from
+   the database rather than being worked out here, because "which days does
+   the bus run" is the timetable, less stand-downs, against a deadline that
+   depends on the garage's opening hours - and a page that worked that out
+   for itself would be a second opinion that eventually disagrees. */
+let DAYS = null;             // [{date, status, bookable, label, short, booked}]
 
 const day = {date: today(), journeys: [], bookings: [], loading: false, message: null};
 const ring = {date: today(), rows: [], loaded: false};
@@ -554,7 +619,7 @@ function renderDay(){
     '<div class="card">' +
       '<label for="dd">Which day</label>' +
       '<div class="row">' +
-        '<input id="dd" type="date" value="' + esc(day.date) + '">' +
+        dayPicker("dd", day.date) +
         '<button class="btn secondary" id="dtoday">Today</button>' +
         '<button class="btn secondary" id="dnext">Next day →</button>' +
       '</div>' +
@@ -564,7 +629,22 @@ function renderDay(){
   if(day.loading){ html += '<div class="card">Loading the day…</div>'; }
   else if(day.message){ html += '<div class="card"><div class="bad">' + esc(day.message) + '</div></div>'; }
   else if(!j.length){
-    html += '<div class="card"><p>Nothing is running that day, and nothing is booked.</p>' +
+    /* NOT "nothing is running". The operator's screenshot showed that
+       sentence against a Monday the bus was running on - what was true was
+       that booking had closed. Three different situations had been collapsed
+       into one, and the one that matters is the difference between "there is
+       no bus" and "there is a bus but you cannot book it now". Telling staff
+       the second is the first is how a caller is turned away from a bus
+       sitting in the yard. */
+    const st = dayStatus(day.date);
+    const line =
+      st === 'deadline_passed'   ? 'The bus runs that day, but booking has closed. Nobody is booked on it.'
+    : st === 'date_in_past'      ? 'That day has been, and nobody was booked on it.'
+    : st === 'journey_cancelled' ? 'That run has been stood down.'
+    : st === 'service_closed'    ? 'The bus is not running that day.'
+    : st === 'ok'                ? 'The bus runs that day and nobody is booked on it yet.'
+    :                              'Nothing is booked for that day.';
+    html += '<div class="card"><p>' + esc(line) + '</p>' +
             '<p class="muted">A journey appears here as soon as the first person is booked onto it.</p></div>';
   }else{
     j.forEach(row => {
@@ -735,7 +815,7 @@ function renderTake(){
     '<h2>Take a booking over the telephone</h2>' +
 
     '<label for="td">Which day</label>' +
-    '<input id="td" type="date" value="' + esc(take.date) + '">' +
+    dayPicker("td", take.date) +
     '<p class="muted" style="margin:.35rem 0 0">' + esc(niceDate(take.date)) + '</p>' +
 
     '<h3>Which way</h3>' +
@@ -1080,7 +1160,7 @@ function renderRing(){
     'is stood down, no text and no email reaches them — somebody has to ring. On the worst ' +
     'morning of the year this is the screen that matters.</p>' +
     '<label for="rd">Which day</label>' +
-    '<input id="rd" type="date" value="' + esc(ring.date) + '">' +
+    dayPicker("rd", ring.date) +
     '</div>';
 
   if(!ring.loaded){ html += '<div class="card">Loading…</div>'; }
@@ -1138,6 +1218,7 @@ async function afterSignIn(){
   if(!ME.active){ render(); return; }
   try{
     CFG = await rpc("bus_page_config", {});
+    await loadDays();
     await loadDirection("outward");
   }catch(e){
     M().innerHTML = '<div class="card"><div class="bad">' + esc(say(e)) + '</div></div>';
