@@ -96,6 +96,20 @@
              overflow:hidden;margin-top:.5rem}
   #staffmap{height:100%;width:100%}
   .muted{color:var(--ink-soft);font-size:.88rem}
+  /* What do I say? — one question per row, tap to open. Big targets,
+     because this is used one-handed with a telephone in the other. */
+  .cribq{display:flex;align-items:center;justify-content:space-between;gap:.6rem;
+         width:100%;text-align:left;font:inherit;font-weight:700;font-size:1.02rem;
+         background:var(--paper);border:0;padding:.95rem;cursor:pointer;color:var(--blue-dark)}
+  .cribq:hover{background:var(--blue-wash)}
+  .cribq .chev{color:var(--ink-soft);font-size:.9rem}
+  .criba{padding:0 .95rem .95rem;border-top:1px solid var(--line)}
+  /* The words to read out, set apart so the eye lands on them first. */
+  .criba .say{font-size:1.08rem;line-height:1.5;margin:.75rem 0 0;
+              padding:.7rem .85rem;background:var(--blue-wash);
+              border-left:4px solid var(--blue);border-radius:0 8px 8px 0}
+  /* And why, for the person reading rather than the caller. */
+  .criba .why{font-size:.9rem;color:var(--ink-soft);margin:.6rem 0 0}
   .hidden{display:none !important}
   footer{padding:1.5rem 1rem 3rem;text-align:center;color:var(--ink-soft);font-size:.82rem}
   @media (max-width:520px){ main{padding:.6rem} .card{padding:.8rem} }
@@ -114,6 +128,7 @@
   <button data-tab="day" aria-selected="true">The day</button>
   <button data-tab="take" aria-selected="false">Take a booking</button>
   <button data-tab="ring" aria-selected="false">To telephone</button>
+  <button data-tab="crib" aria-selected="false">What do I say?</button>
 </nav>
 
 <main id="main"><div class="card">Loading…</div></main>
@@ -236,6 +251,7 @@ async function rpc(fn, args){
 async function loadDays(){
   try{
     DAYS = await rpc("bus_staff_days", {}) || [];
+    try{ CRIB = await rpc("bus_staff_crib", {}) || []; }catch(_){ CRIB = []; }
     /* The tabs want different days, and it is worth being deliberate.
 
        THE DAY and WHO TO TELEPHONE want TODAY when the bus is running
@@ -370,6 +386,14 @@ const today = () => new Date().toISOString().slice(0, 10);
    depends on the garage's opening hours - and a page that worked that out
    for itself would be a second opinion that eventually disagrees. */
 let DAYS = null;             // [{date, status, bookable, label, short, booked}]
+
+/* THE CRIB SHEET. Fetched once at sign-in. Written to be read ALOUD with a
+   customer on the telephone - question first, then words the person can say
+   straight back. Each answer also carries WHY, because anyone who only
+   learns the rule gets talked round by a persistent caller and anyone who
+   knows the reason does not. */
+let CRIB = null;
+let CRIB_OPEN = {};          // slug -> true when expanded
 
 const day = {date: today(), journeys: [], bookings: [], loading: false, message: null};
 const ring = {date: today(), rows: [], loaded: false};
@@ -555,6 +579,7 @@ function render(){
   });
   if(TAB === "day") return renderDay();
   if(TAB === "take") return renderTake();
+  if(TAB === "crib"){ renderCrib(); return; }
   if(TAB === "ring") return renderRing();
 }
 
@@ -612,6 +637,50 @@ function renderNoAccess(){
         '<p class="muted">Ask Duncan to switch it back on in the staff portal.</p>') +
     '<p></p><button class="btn secondary wide" id="again">Try again</button></div>';
   el("again").onclick = () => afterSignIn();
+}
+
+/* ------------------------ What do I say? ------------------------- */
+/* Tap a question, get the answer. The answer is what to SAY; the note
+   underneath is why, for the person reading it rather than the caller. */
+function renderCrib(){
+  let html =
+    '<div class="card">' +
+      '<h2>What do I say?</h2>' +
+      '<p class="muted">The plain answer, in words you can read out. Tap a question.</p>' +
+    '</div>';
+
+  if(!CRIB){ html += '<div class="card">Loading…</div>'; }
+  else if(!CRIB.length){
+    html += '<div class="card"><p>No answers have been written yet.</p></div>';
+  }else{
+    CRIB.forEach(c => {
+      const open = !!CRIB_OPEN[c.slug];
+      html += '<div class="card" style="padding:0;overflow:hidden">' +
+        '<button class="cribq" data-crib="' + esc(c.slug) + '" aria-expanded="' + open + '">' +
+          '<span>' + esc(c.question) + '</span>' +
+          '<span class="chev">' + (open ? '&#9662;' : '&#9656;') + '</span>' +
+        '</button>' +
+        (open
+          ? '<div class="criba">' +
+              '<p class="say">' + esc(c.answer) + '</p>' +
+              (c.reason ? '<p class="why"><strong>Why:</strong> ' + esc(c.reason) + '</p>' : '') +
+            '</div>'
+          : '') +
+      '</div>';
+    });
+    const foot = (CFG && CFG.wording && CFG.wording.office_crib_footer) ||
+      'If you do not know, say you will find out and ring them back. Never guess at something that affects whether somebody can travel.';
+    html += '<div class="card"><p><strong>' + esc(foot) + '</strong></p></div>';
+  }
+
+  M().innerHTML = html;
+  M().querySelectorAll("button[data-crib]").forEach(b => {
+    b.onclick = () => {
+      const s = b.getAttribute("data-crib");
+      CRIB_OPEN[s] = !CRIB_OPEN[s];
+      renderCrib();
+    };
+  });
 }
 
 /* ---------------------------- The day ---------------------------- */
