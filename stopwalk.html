@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#164a6d">
+<meta name="robots" content="noindex,nofollow">
+<title>Service 704 — walking the stops</title>
+<style>
+  :root{
+    --ink:#121c25; --ink-soft:#4a6272; --line:#c2d0d9; --paper:#fff; --wash:#eaf0f4;
+    --blue:#1f5f8b; --blue-dark:#164a6d; --blue-wash:#e6f0f7;
+    --green:#16663f; --green-wash:#e2f1e9;
+    --red:#9c2018; --red-wash:#fbeae8;
+    --amber:#a86c00; --amber-wash:#fdf2df;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:rgba(31,95,139,.15)}
+  html{-webkit-text-size-adjust:100%}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
+       color:var(--ink);background:var(--wash);font-size:18px;line-height:1.45}
+  header{background:var(--blue-dark);color:#fff;padding:.7rem .9rem;
+         padding-top:calc(.7rem + env(safe-area-inset-top));
+         display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;position:sticky;top:0;z-index:10}
+  header h1{margin:0;font-size:1rem;font-weight:600;flex:1 1 auto}
+  header button, header a.hbtn{font:inherit;font-size:.85rem;background:rgba(255,255,255,.16);
+                color:#fff;text-decoration:none;border:1px solid rgba(255,255,255,.45);
+                border-radius:8px;padding:.35rem .8rem;cursor:pointer;display:inline-block}
+  .banner{padding:.6rem .9rem;font-size:.95rem;font-weight:600;text-align:center}
+  .banner.off{background:var(--amber-wash);color:#7a4f00;border-bottom:2px solid var(--amber)}
+  .banner.queued{background:var(--blue-wash);color:var(--blue-dark);border-bottom:2px solid var(--blue)}
+  main{max-width:760px;margin:0 auto;padding:.8rem;
+       padding-bottom:calc(4rem + env(safe-area-inset-bottom))}
+  .card{background:var(--paper);border:1px solid var(--line);border-radius:14px;
+        padding:.9rem;margin-bottom:.8rem}
+  h2{margin:0 0 .5rem;font-size:1.05rem;color:var(--blue-dark)}
+  p{margin:.4rem 0}
+  .muted{color:var(--ink-soft);font-size:.9rem}
+  label{display:block;font-weight:600;font-size:.95rem;margin:.7rem 0 .25rem}
+  input{font:inherit;width:100%;padding:.7rem;border:2px solid var(--line);
+        border-radius:10px;min-height:52px;background:var(--paper);color:var(--ink)}
+  .btn{font:inherit;font-weight:700;min-height:56px;border-radius:12px;cursor:pointer;
+       border:2px solid var(--blue);background:var(--blue);color:#fff;padding:.5rem 1rem;
+       display:inline-flex;align-items:center;justify-content:center;gap:.4rem;width:100%}
+  .btn.secondary{background:var(--paper);color:var(--blue)}
+  .btn.ghost{background:transparent;border-color:var(--line);color:var(--ink-soft);
+             min-height:44px;font-weight:600;font-size:.9rem}
+  .btn[disabled]{opacity:.45}
+  .pick{display:flex;gap:.5rem;margin:.6rem 0}
+  .pick button{flex:1;min-height:56px;font:inherit;font-size:1rem;font-weight:700;cursor:pointer;
+               border:2px solid var(--line);background:var(--paper);color:var(--blue);border-radius:12px}
+  .pick button[aria-pressed="true"]{background:var(--blue);color:#fff;border-color:var(--blue)}
+  .stop{background:var(--paper);border:2px solid var(--line);border-radius:14px;
+        padding:.85rem;margin-bottom:.7rem}
+  .stop.done{border-color:var(--green);background:var(--green-wash)}
+  .stop.queued{border-color:var(--blue);background:var(--blue-wash)}
+  .stop h3{margin:0 0 .15rem;font-size:1.15rem}
+  .stop .sub{font-size:.85rem;color:var(--ink-soft);margin-bottom:.5rem}
+  .tag{display:inline-block;font-size:.75rem;font-weight:700;border-radius:999px;
+       padding:.12rem .55rem;margin:0 .3rem .3rem 0;border:1px solid}
+  .tag.off{background:var(--amber-wash);color:#7a4f00;border-color:var(--amber)}
+  .tag.ok{background:var(--green-wash);color:var(--green);border-color:var(--green)}
+  .tag.n{background:var(--blue-wash);color:var(--blue-dark);border-color:var(--blue)}
+  .verdict{margin-top:.55rem;padding:.55rem .7rem;border-radius:10px;font-size:.92rem;
+           background:var(--wash);border:1px solid var(--line)}
+  .verdict.good{background:var(--green-wash);border-color:var(--green);color:var(--green)}
+  .verdict.warn{background:var(--amber-wash);border-color:var(--amber);color:#7a4f00}
+  .err{background:var(--red-wash);border:2px solid var(--red);color:var(--red);
+       border-radius:10px;padding:.6rem .8rem;margin:.6rem 0;font-weight:600}
+  .hidden{display:none !important}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Walking the stops</h1>
+  <span id="who" class="muted" style="color:#cfe1ee;font-size:.8rem"></span>
+  <a class="hbtn" href="./home.html">All screens</a>
+  <button id="out" class="hidden" type="button">Sign out</button>
+</header>
+
+<div id="banner" class="banner hidden"></div>
+<main id="main"></main>
+
+<script>
+/* =====================================================================
+   WALKING THE STOPS
+   =====================================================================
+   Every stop coordinate on this service is provisional. They came from a
+   map link and from OpenStreetMap, not from anybody standing at the stop.
+   They matter because when Malcolm records a walk-on, his phone picks the
+   nearest stop from these numbers - and on that road the wrong side of a
+   village is two fare stages.
+
+   THIS PAGE PROPOSES. IT DOES NOT MOVE ANYTHING.
+   A tap records where the phone thinks it is, and somebody looks at the
+   list afterwards. That is deliberate: a phone that is confidently 300
+   metres out - which happens in a glen, and happens worst exactly where
+   this route runs - would otherwise silently move a stop and corrupt
+   every walk-on recorded near it afterwards. The screen says so plainly,
+   because a man who thinks he is fixing the map should know he is not.
+
+   THREE THINGS IT IS BUILT AROUND:
+
+   1. NO SIGNAL IS THE NORMAL CASE. The stops with the worst coordinates
+      are in the places with the worst signal. Every tap is stored on the
+      phone first and sent when there is a bar, carrying the time it was
+      really made.
+
+   2. HE IS OUTSIDE, ON HIS FEET, PROBABLY IN THE RAIN. One big button per
+      stop. No forms, no confirmations, nothing to read before it works.
+
+   3. IT MUST TELL HIM WHETHER HE DID ANY GOOD. A number of metres means
+      nothing standing at a road end. The database sends back a sentence,
+      and the screen shows that instead.
+===================================================================== */
+
+const SUPABASE_URL = "https://wkyjsdiqnuknnkyavnyd.supabase.co";
+const ANON_KEY = "sb_publishable_y22lUaDRfZBvVoUHcwNb_Q_gSqw7Pa_";
+const K = {
+  session: "bus704.walk.session",
+  queue:   "bus704.walk.queue",
+  list:    "bus704.walk.list",
+  done:    "bus704.walk.done"
+};
+
+function keep(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(_){} }
+function recall(k, d){
+  try{ const s = localStorage.getItem(k); return s ? JSON.parse(s) : d; }catch(_){ return d; }
+}
+function forget(k){ try{ localStorage.removeItem(k); }catch(_){} }
+
+let SESSION = recall(K.session, null);
+let ME = null;
+let ONLINE = navigator.onLine !== false;
+let QUEUE = recall(K.queue, []);
+let LIST = recall(K.list, null);
+let DONE = recall(K.done, {});     // stop id -> {verdict, metres, at}
+let DIRECTION = "outward";
+let BUSY = {};                     // stop id -> true while the phone is thinking
+let ERROR = "";
+let flushing = false;
+
+/* ---------------- talking to the database ---------------- */
+async function authPost(grant, body){
+  const r = await fetch(SUPABASE_URL + "/auth/v1/token?grant_type=" + grant, {
+    method: "POST", headers: {apikey: ANON_KEY, "Content-Type": "application/json"},
+    body: JSON.stringify(body)
+  });
+  const j = await r.json().catch(() => ({}));
+  if(!r.ok) throw new Error(j.error_description || j.msg || j.error || "sign_in_failed");
+  return {access_token: j.access_token, refresh_token: j.refresh_token,
+          expires_at: Date.now() + ((j.expires_in || 3600) - 60) * 1000};
+}
+function setSession(s){ SESSION = s; if(s) keep(K.session, s); else forget(K.session); }
+async function token(){
+  if(!SESSION) throw new Error("not_signed_in");
+  if(SESSION.expires_at && Date.now() > SESSION.expires_at){
+    setSession(await authPost("refresh_token", {refresh_token: SESSION.refresh_token}));
+  }
+  return SESSION.access_token;
+}
+async function rpc(fn, args){
+  const t = await token();
+  const r = await fetch(SUPABASE_URL + "/rest/v1/rpc/" + fn, {
+    method: "POST",
+    headers: {apikey: ANON_KEY, Authorization: "Bearer " + t, "Content-Type": "application/json"},
+    body: JSON.stringify(args || {})
+  });
+  if(r.status === 401){ setSession(null); ME = null; throw new Error("your_sign_in_has_run_out"); }
+  const text = await r.text();
+  let body = null; try{ body = text ? JSON.parse(text) : null; }catch(_){}
+  if(!r.ok){
+    const e = new Error((body && body.message) || text || "request_failed");
+    e.code = body && body.message ? String(body.message) : "";
+    throw e;
+  }
+  return body;
+}
+
+const SAY = {
+  not_permitted: "Your account is not allowed to record stops. Ring the office.",
+  no_such_stop: "That stop is not in the system any more. Pull the list down again when you have signal.",
+  no_position: "The phone could not work out where it is. Wait a moment and try again.",
+  your_sign_in_has_run_out: "Your sign-in has run out. Sign in again when you have signal.",
+  not_signed_in: "Please sign in.",
+  sign_in_failed: "That email address and password did not work."
+};
+function say(e){
+  const c = (e && e.code) || String((e && e.message) || e);
+  return SAY[c] || c;
+}
+
+/* ---------------- the queue ----------------
+   Same dull, proven shape as the driver's screen. A tap goes in here and
+   is shown at once; a separate loop sends it. Each entry carries the
+   moment the tap was made, so a stop recorded at Shieldaig with no signal
+   is not later recorded as having happened at Garve. */
+function enqueue(fn, args){
+  QUEUE.push({id: Date.now() + "-" + Math.random().toString(36).slice(2, 7),
+              fn, args, at: new Date().toISOString(), tries: 0});
+  keep(K.queue, QUEUE);
+  flush();
+}
+async function flush(){
+  if(flushing || !QUEUE.length || !SESSION) return;
+  if(navigator.onLine === false){ ONLINE = false; render(); return; }
+  flushing = true;
+  while(QUEUE.length){
+    const item = QUEUE[0];
+    try{
+      const res = await rpc(item.fn, item.args);
+      QUEUE.shift(); keep(K.queue, QUEUE);
+      ONLINE = true;
+      /* The database's own sentence beats anything this page could invent,
+         because it knows how far off the held position actually is. */
+      if(res && res.ok && item.args.p_pickup_point_id){
+        DONE[item.args.p_pickup_point_id] = {
+          verdict: res.verdict || "Recorded.",
+          metres: res.metres_from_current,
+          at: item.at, sent: true
+        };
+        keep(K.done, DONE);
+      }else if(res && res.ok === false){
+        ERROR = say({code: res.reason});
+      }
+    }catch(e){
+      const code = (e && e.code) || "";
+      if(code && !/Failed to fetch|NetworkError|load failed/i.test(String(e.message))){
+        item.tries++;
+        if(item.tries >= 3){ QUEUE.shift(); keep(K.queue, QUEUE); ERROR = say(e); }
+        else keep(K.queue, QUEUE);
+      }else{ ONLINE = false; break; }
+    }
+  }
+  flushing = false;
+  render();
+}
+window.addEventListener("online",  () => { ONLINE = true;  flush(); render(); });
+window.addEventListener("offline", () => { ONLINE = false; render(); });
+setInterval(() => { if(QUEUE.length) flush(); }, 20000);
+
+/* ---------------- where am I ----------------
+   The same rule as the walk-on button on the driver's screen: the record
+   is never held up waiting for a fix. Six seconds, then take what we have.
+   Here, though, a position with nothing in it is useless - the whole point
+   is the position - so it refuses rather than storing a blank. */
+function whereAmI(){
+  return new Promise(resolve => {
+    let settled = false;
+    const once = v => { if(!settled){ settled = true; resolve(v); } };
+    if(!navigator.geolocation){ once(null); return; }
+    setTimeout(() => once(null), 12000);
+    try{
+      navigator.geolocation.getCurrentPosition(
+        p => once({lat: p.coords.latitude, lng: p.coords.longitude,
+                   acc: p.coords.accuracy == null ? null : Math.round(p.coords.accuracy)}),
+        () => once(null),
+        {enableHighAccuracy: true, timeout: 11000, maximumAge: 0});
+    }catch(_){ once(null); }
+  });
+}
+
+/* ---------------- actions ---------------- */
+async function tap(stop){
+  ERROR = "";
+  BUSY[stop.id] = true; render();
+  const pos = await whereAmI();
+  BUSY[stop.id] = false;
+  if(!pos){
+    ERROR = "The phone could not work out where it is. Stand still for a moment and try again.";
+    render(); return;
+  }
+  const at = new Date().toISOString();
+  DONE[stop.id] = {verdict: "Saved on the phone. It will send when you have a signal.",
+                   metres: null, at, sent: false};
+  keep(K.done, DONE);
+  enqueue("bus_stop_walk_record", {
+    p_pickup_point_id: stop.id,
+    p_latitude: pos.lat, p_longitude: pos.lng,
+    p_accuracy_metres: pos.acc,
+    p_note: null,
+    p_occurred_at: at,
+    p_recorded_offline_at: navigator.onLine === false ? at : null
+  });
+  render();
+}
+
+async function load(){
+  try{
+    const rows = await rpc("bus_stop_walk_list", {p_direction: DIRECTION});
+    LIST = rows || [];
+    keep(K.list, LIST);
+    ERROR = "";
+  }catch(e){ ERROR = say(e); }
+  render();
+}
+
+async function signIn(email, password){
+  ERROR = "";
+  try{
+    setSession(await authPost("password", {email, password}));
+    ME = await rpc("bus_staff_whoami");
+    await load();
+  }catch(e){ ERROR = say(e); render(); }
+}
+
+/* ---------------- drawing it ---------------- */
+function el(id){ return document.getElementById(id); }
+function esc(s){ return String(s == null ? "" : s)
+  .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+
+function render(){
+  const b = el("banner");
+  if(!ONLINE){
+    b.className = "banner off";
+    b.textContent = QUEUE.length
+      ? "No signal — " + QUEUE.length + " waiting on the phone. They will send themselves."
+      : "No signal. Carry on tapping; it all keeps.";
+  }else if(QUEUE.length){
+    b.className = "banner queued";
+    b.textContent = "Sending " + QUEUE.length + "…";
+  }else{
+    b.className = "banner hidden";
+  }
+
+  el("who").textContent = ME && ME.name ? ME.name : "";
+  el("out").classList.toggle("hidden", !SESSION);
+
+  const m = el("main");
+
+  if(!SESSION){
+    m.innerHTML =
+      '<div class="card"><h2>Sign in</h2>' +
+      '<p class="muted">Your normal Ross Group staff login — the same one as the tyre screens.</p>' +
+      (ERROR ? '<div class="err">' + esc(ERROR) + '</div>' : '') +
+      '<label for="em">Email address</label><input id="em" type="email" autocomplete="username" inputmode="email">' +
+      '<label for="pw">Password</label><input id="pw" type="password" autocomplete="current-password">' +
+      '<div style="height:.8rem"></div>' +
+      '<button class="btn" id="go" type="button">Sign in</button></div>';
+    el("go").onclick = () => signIn(el("em").value.trim(), el("pw").value);
+    el("pw").onkeydown = e => { if(e.key === "Enter") el("go").click(); };
+    return;
+  }
+
+  if(ME && ME.active === false){
+    m.innerHTML = '<div class="card"><h2>Your login works, but it does not open the bus</h2>' +
+      '<p>Ask the office to switch on Bus booking for your account.</p></div>';
+    return;
+  }
+
+  let h = '';
+  h += '<div class="card">' +
+       '<h2>What this does</h2>' +
+       '<p>Stand at a stop and tap it. It records where your phone thinks you are.</p>' +
+       '<p><strong>It does not move the stop.</strong> Somebody looks at these afterwards and ' +
+       'decides. So tap freely — you cannot break anything from here.</p>' +
+       '<p class="muted">No signal is fine. Everything keeps on the phone and sends itself later, ' +
+       'remembering the time you actually tapped.</p>' +
+       '<div class="pick">' +
+       '<button type="button" aria-pressed="' + (DIRECTION === "outward") + '" id="dout">Going out</button>' +
+       '<button type="button" aria-pressed="' + (DIRECTION === "return") + '" id="dret">Coming home</button>' +
+       '</div>' +
+       '<button class="btn ghost" id="reload" type="button">Fetch the list again</button>' +
+       '</div>';
+
+  if(ERROR) h += '<div class="err">' + esc(ERROR) + '</div>';
+
+  if(!LIST){
+    h += '<div class="card"><p>Fetching the stops…</p></div>';
+  }else if(!LIST.length){
+    h += '<div class="card"><p>No stops came back. Try again when you have a signal.</p></div>';
+  }else{
+    LIST.forEach(s => {
+      const d = DONE[s.id];
+      const busy = !!BUSY[s.id];
+      const cls = d ? (d.sent ? "stop done" : "stop queued") : "stop";
+      h += '<div class="' + cls + '">' +
+           '<h3>' + esc(s.name) + '</h3>' +
+           '<div class="sub">' + esc(s.description || "") + '</div>';
+      if(s.deliberately_off_road){
+        h += '<span class="tag off">Off the main road on purpose</span>';
+      }
+      if(Number(s.applied) > 0) h += '<span class="tag ok">Confirmed before</span>';
+      if(Number(s.pending) > 0) h += '<span class="tag n">' + s.pending + ' waiting to be looked at</span>';
+      h += '<button class="btn' + (d ? ' secondary' : '') + '" data-id="' + s.id + '"' +
+           (busy ? ' disabled' : '') + ' type="button">' +
+           (busy ? 'Finding you…' : (d ? 'Record it again' : 'I am here')) + '</button>';
+      if(d){
+        const good = d.sent && d.metres != null && d.metres <= 25;
+        const warn = d.sent && d.metres != null && d.metres > 150;
+        h += '<div class="verdict' + (good ? ' good' : (warn ? ' warn' : '')) + '">' +
+             esc(d.verdict) +
+             (d.sent === false ? '' : (d.metres != null ? ' (' + d.metres + ' m from what we hold)' : '')) +
+             '</div>';
+      }
+      h += '</div>';
+    });
+  }
+
+  m.innerHTML = h;
+
+  el("dout").onclick = () => { DIRECTION = "outward"; load(); };
+  el("dret").onclick = () => { DIRECTION = "return";  load(); };
+  el("reload").onclick = load;
+  Array.prototype.forEach.call(m.querySelectorAll("button[data-id]"), btn => {
+    btn.onclick = () => {
+      const s = (LIST || []).find(x => x.id === btn.getAttribute("data-id"));
+      if(s) tap(s);
+    };
+  });
+}
+
+el("out").onclick = () => {
+  setSession(null); ME = null; LIST = null;
+  forget(K.list);
+  render();
+};
+
+/* ---------------- start ---------------- */
+(async () => {
+  render();
+  if(SESSION){
+    try{
+      ME = await rpc("bus_staff_whoami");
+      await load();
+      flush();
+    }catch(e){ ERROR = say(e); render(); }
+  }
+})();
+</script>
+</body>
+</html>
