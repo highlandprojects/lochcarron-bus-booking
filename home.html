@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#164a6d">
+<meta name="robots" content="noindex, nofollow">
+<title>Service 704 — the three screens</title>
+<style>
+  :root{
+    --ink:#16232e; --ink-soft:#48606f; --line:#c8d4dc; --paper:#fff; --wash:#eef3f6;
+    --blue:#1f5f8b; --blue-dark:#164a6d; --blue-wash:#e8f1f7;
+    --green:#1d6b45; --green-wash:#e6f2eb;
+    --amber-wash:#fdf3e0; --amber-line:#c88a1e;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:rgba(31,95,139,.15)}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
+       color:var(--ink);background:var(--wash);font-size:17px;line-height:1.5}
+  header{background:var(--blue-dark);color:#fff;padding:1.1rem 1rem;
+         padding-top:calc(1.1rem + env(safe-area-inset-top));text-align:center}
+  header h1{margin:0;font-size:1.15rem}
+  header p{margin:.3rem 0 0;font-size:.9rem;opacity:.85}
+  main{max-width:640px;margin:0 auto;padding:1rem;
+       padding-bottom:calc(2rem + env(safe-area-inset-bottom))}
+  a.tile{display:block;text-decoration:none;color:inherit;background:var(--paper);
+         border:2px solid var(--line);border-radius:14px;padding:1rem 1.1rem;
+         margin-bottom:.85rem;min-height:96px}
+  a.tile:hover{border-color:var(--blue);background:var(--blue-wash)}
+  a.tile .top{display:flex;align-items:baseline;gap:.6rem;flex-wrap:wrap}
+  a.tile strong{font-size:1.15rem;color:var(--blue-dark)}
+  a.tile .who{font-size:.78rem;font-weight:700;padding:.15rem .55rem;border-radius:20px;
+              background:var(--blue-wash);color:var(--blue-dark);white-space:nowrap}
+  a.tile .who.open{background:var(--green-wash);color:var(--green)}
+  a.tile p{margin:.35rem 0 0;color:var(--ink-soft);font-size:.95rem}
+  h2{margin:1.6rem 0 .6rem;font-size:.82rem;color:var(--ink-soft);
+     text-transform:uppercase;letter-spacing:.06em}
+  .note{background:var(--amber-wash);border-left:5px solid var(--amber-line);
+        padding:.75rem .9rem;border-radius:0 8px 8px 0;margin:1.2rem 0;font-size:.93rem}
+  footer{padding:1.2rem 1rem 3rem;text-align:center;color:var(--ink-soft);font-size:.85rem}
+  footer a{color:var(--blue)}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Lochcarron Garage — Service 704</h1>
+  <p>Applecross and Lochcarron to Inverness</p>
+</header>
+
+<main>
+
+  <h2>For the garage</h2>
+
+  <a class="tile" href="staff.html">
+    <span class="top"><strong>The office</strong>
+      <span class="who">sign in</span></span>
+    <p>Somebody has rung up and wants a seat. Take the booking, see the day and how many
+       seats are left, change or cancel a booking, and get the list of everyone who has
+       to be telephoned if a run is stood down.</p>
+  </a>
+
+  <a class="tile" href="driver.html">
+    <span class="top"><strong>The driver</strong>
+      <span class="who">sign in</span></span>
+    <p>The run in road order on a phone. Tap people on, record anybody who flags the bus
+       down, and tidy up at the end. Works with no signal — everything is kept on the
+       phone and sends itself later.</p>
+  </a>
+
+  <h2>For customers</h2>
+
+  <a class="tile" href="./">
+    <span class="top"><strong>Book a seat online</strong>
+      <span class="who open">anyone</span></span>
+    <p>What a customer sees. This is the page to send people to, or to have open at the
+       counter if somebody would rather book it themselves.</p>
+  </a>
+
+  <a class="tile" href="route.html">
+    <span class="top"><strong>The route and every stop</strong>
+      <span class="who open">anyone</span></span>
+    <p>Both directions on a map, every stop in order with its time. Useful on the
+       telephone when somebody asks where the bus actually goes.</p>
+  </a>
+
+  <div class="note">
+    <strong>The two garage screens need a sign-in.</strong> Signing in to Supabase does
+    not by itself give anybody anything — only the people on the list can see a booking.
+    If you have not got a login yet, it is five minutes in the Supabase dashboard, and
+    only Duncan can set one up.
+  </div>
+
+</main>
+
+<footer>
+  Lochcarron Garage · telephone <a href="tel:01520722997">01520&nbsp;722997</a><br>
+  Open 7am to 6pm. Closed Sundays.
+</footer>
+
+</body>
+</html>

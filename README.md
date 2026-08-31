@@ -4,6 +4,7 @@ Three pages, all static, all reading the live database directly.
 
 | Page | Who it is for |
 |---|---|
+| `home.html` | **The one to bookmark.** Links to all four, says which is which. Not linked from the customer page, and marked noindex. |
 | `index.html` | The public booking page. |
 | `route.html` | The route and every stop, both directions. Linked from the booking page. |
 | `staff.html` | **The office.** Taking bookings over the telephone, the day, the call list. Sign-in required — it is deliberately not linked from the public page. |

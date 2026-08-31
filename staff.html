@@ -19,8 +19,9 @@
          align-items:center;gap:.75rem;flex-wrap:wrap}
   header h1{margin:0;font-size:1.05rem;flex:1 1 auto}
   header .who{font-size:.85rem;opacity:.9}
-  header button{font:inherit;font-size:.85rem;background:rgba(255,255,255,.15);color:#fff;
-                border:1px solid rgba(255,255,255,.4);border-radius:8px;padding:.3rem .7rem;cursor:pointer}
+  header button, header a.hbtn{font:inherit;font-size:.85rem;background:rgba(255,255,255,.15);
+                color:#fff;text-decoration:none;border:1px solid rgba(255,255,255,.4);
+                border-radius:8px;padding:.3rem .7rem;cursor:pointer;display:inline-block}
   nav{display:flex;background:var(--paper);border-bottom:1px solid var(--line);
       position:sticky;top:0;z-index:5;overflow-x:auto}
   nav button{flex:1 1 auto;min-height:48px;font:inherit;font-weight:600;cursor:pointer;
@@ -105,6 +106,7 @@
 <header>
   <h1>Service 704 — the office</h1>
   <span class="who" id="who"></span>
+  <a class="hbtn" href="home.html">All screens</a>
   <button id="signout" class="hidden">Sign out</button>
 </header>
 
@@ -117,8 +119,11 @@
 
 <main id="main"><div class="card">Loading…</div></main>
 
-<footer>Lochcarron Garage · Service 704 · this screen is for staff. Customers book at
-  <a href="./">the public page</a>.</footer>
+<footer>Lochcarron Garage · Service 704 · this screen is for staff.<br>
+  <a href="home.html">All screens</a> ·
+  <a href="driver.html">the driver's screen</a> ·
+  <a href="./">what customers see</a> ·
+  <a href="route.html">the route and stops</a></footer>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/4.7.1/maplibre-gl.min.js"></script>
 <script>

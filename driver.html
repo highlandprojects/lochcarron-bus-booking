@@ -21,8 +21,9 @@
          padding-top:calc(.7rem + env(safe-area-inset-top));
          display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;position:sticky;top:0;z-index:10}
   header h1{margin:0;font-size:1rem;font-weight:600;flex:1 1 auto}
-  header button{font:inherit;font-size:.85rem;background:rgba(255,255,255,.16);color:#fff;
-                border:1px solid rgba(255,255,255,.45);border-radius:8px;padding:.35rem .8rem;cursor:pointer}
+  header button, header a.hbtn{font:inherit;font-size:.85rem;background:rgba(255,255,255,.16);
+                color:#fff;text-decoration:none;border:1px solid rgba(255,255,255,.45);
+                border-radius:8px;padding:.35rem .8rem;cursor:pointer;display:inline-block}
   .banner{padding:.6rem .9rem;font-size:.95rem;font-weight:600;text-align:center}
   .banner.off{background:var(--amber-wash);color:#7a4f00;border-bottom:2px solid var(--amber)}
   .banner.queued{background:var(--blue-wash);color:var(--blue-dark);border-bottom:2px solid var(--blue)}
@@ -94,6 +95,7 @@
 <header>
   <h1 id="title">Service 704 — the driver</h1>
   <button id="back" class="hidden">Back</button>
+  <a class="hbtn" href="home.html">Screens</a>
   <button id="signout" class="hidden">Sign out</button>
 </header>
 <div id="banner"></div>
