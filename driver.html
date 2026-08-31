@@ -277,6 +277,27 @@ function niceDate(d){
   try{ return new Date(d + "T12:00:00").toLocaleDateString("en-GB",
     {weekday: "long", day: "numeric", month: "long"}); }catch(_){ return d; }
 }
+/* The database stores requirement types as words like "walking_aid",
+   which is right for a database and wrong for a screen somebody reads at
+   speed. The detail a customer typed is kept exactly as they typed it. */
+const REQ_WORDS = {
+  folding_wheelchair: "folding wheelchair",
+  walking_aid: "walking stick or frame",
+  pushchair: "pushchair",
+  large_luggage: "large luggage",
+  dog: "dog",
+  bicycle: "bicycle",
+  other: "something else"
+};
+function prettyReqs(s){
+  if(!s) return "";
+  return String(s).split(", ").map(part => {
+    const m = /^([a-z_]+)(\s*\((.*)\))?$/.exec(part.trim());
+    if(!m) return part;
+    const word = REQ_WORDS[m[1]] || m[1].replace(/_/g, " ");
+    return word + (m[3] ? " (" + m[3] + ")" : "");
+  }).join(", ");
+}
 function howOld(iso){
   if(!iso) return "";
   const mins = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
@@ -427,8 +448,15 @@ function renderSheet(){
       '<div class="sub">off at ' + esc(r.drop_off) + '</div>' +
       (r.telephone ? '<a class="tel" href="tel:' +
         esc(String(r.telephone).replace(/\s/g, "")) + '">' + esc(r.telephone) + '</a>' : '') +
+      /* A pin pickup is a spot on a road with no name. One tap opens it in
+         whatever maps app the phone has, which is the difference between
+         finding it and driving past it twice. */
+      (r.pickup_latitude && r.pickup_longitude
+        ? ' <a class="tel" href="https://www.google.com/maps/search/?api=1&query=' +
+          encodeURIComponent(r.pickup_latitude + "," + r.pickup_longitude) +
+          '" target="_blank" rel="noopener">Show me on the map</a>' : '') +
       '<div class="flags">' +
-        (r.requirements ? '<span class="flag warn">' + esc(r.requirements) + '</span>' : '') +
+        (r.requirements ? '<span class="flag warn">' + esc(prettyReqs(r.requirements)) + '</span>' : '') +
         (r.needs_trailer ? '<span class="flag warn">trailer</span>' : '') +
         (r.is_override ? '<span class="flag warn">seat 13/14</span>' : '') +
         (r.can_be_texted === false ? '<span class="flag bad">no text — ring only</span>' : '') +

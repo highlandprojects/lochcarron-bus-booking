@@ -337,6 +337,29 @@ const REQS = [
 
 function wording(k, d){ return (CFG && CFG.wording && CFG.wording[k]) || d || ""; }
 
+/* The database stores requirement types as words like "walking_aid",
+   which is right for a database and wrong for a screen somebody reads at
+   speed. The detail a customer typed is kept exactly as they typed it. */
+const REQ_WORDS = {
+  folding_wheelchair: "folding wheelchair",
+  walking_aid: "walking stick or frame",
+  pushchair: "pushchair",
+  large_luggage: "large luggage",
+  dog: "dog",
+  bicycle: "bicycle",
+  other: "something else"
+};
+function prettyReqs(s){
+  if(!s) return "";
+  return String(s).split(", ").map(part => {
+    const m = /^([a-z_]+)(\s*\((.*)\))?$/.exec(part.trim());
+    if(!m) return part;
+    const word = REQ_WORDS[m[1]] || m[1].replace(/_/g, " ");
+    return word + (m[3] ? " (" + m[3] + ")" : "");
+  }).join(", ");
+}
+
+
 /* ------------------------------------------------------------------
    Stops, and where a pin falls along the road
 ------------------------------------------------------------------ */
@@ -572,7 +595,7 @@ function renderDay(){
               (b.estimated_time ? ' · due ' + esc(String(b.estimated_time).slice(0, 5)) : '') + '</div>' +
             '<div class="ref">' + esc(b.reference) +
               (b.contact ? ' · ' + esc(b.contact) : '') + '</div>' +
-            (b.requirements ? '<div class="where">Needs: ' + esc(b.requirements) + '</div>' : '') +
+            (b.requirements ? '<div class="where">Needs: ' + esc(prettyReqs(b.requirements)) + '</div>' : '') +
             (b.override_reason ? '<div class="where">Seat 13/14 because: ' + esc(b.override_reason) + '</div>' : '') +
             (b.notes ? '<div class="where">Note: ' + esc(b.notes) + '</div>' : '') +
           '</div>' +
