@@ -125,8 +125,8 @@
       confident.
 ===================================================================== */
 
-const SUPABASE_URL = "https://sswidsjglvpbbthsqwdy.supabase.co";
-const ANON_KEY = "sb_publishable_HYylK1k8WEtN3RC56zXNXA_ViLb3Zuw";
+const SUPABASE_URL = "https://wkyjsdiqnuknnkyavnyd.supabase.co";
+const ANON_KEY = "sb_publishable_y22lUaDRfZBvVoUHcwNb_Q_gSqw7Pa_";
 const K = {
   session: "bus704.driver.session",
   queue:   "bus704.driver.queue",
@@ -345,8 +345,8 @@ function renderSignIn(){
   el("back").classList.add("hidden");
   el("title").textContent = "Service 704 — the driver";
   M().innerHTML = '<div class="card"><h2>Sign in</h2>' +
-    '<p class="muted">Sign in once, where there is signal. The phone stays signed in ' +
-    'afterwards, so you can carry on out of range.</p>' +
+    '<p class="muted">Your usual Ross Group staff login. Sign in once, where there is ' +
+    'signal — the phone stays signed in afterwards, so you can carry on out of range.</p>' +
     '<div id="err"></div>' +
     '<label for="em">Email address</label><input id="em" type="email" autocomplete="username" inputmode="email">' +
     '<label for="pw">Password</label><input id="pw" type="password" autocomplete="current-password">' +
@@ -367,10 +367,18 @@ function renderSignIn(){
 }
 
 function renderNoAccess(){
-  M().innerHTML = '<div class="card"><h2>Your account is not set up yet</h2>' +
-    '<p>You have signed in, but nobody has said what you are allowed to do.</p>' +
-    '<p class="muted">Ask Duncan to add ' + esc(ME.email || "your email address") +
-    ' on the office screen.</p></div>';
+  const knocked = ME && ME.has_login_but_no_bus_access;
+  M().innerHTML = '<div class="card"><h2>' +
+    (knocked ? 'Your login does not open the bus yet' : 'Your account is not active') +
+    '</h2>' +
+    (knocked
+      ? '<p>Signed in as <strong>' + esc(ME.name || ME.email || "") + '</strong>, but the bus ' +
+        'has not been switched on for you.</p>' +
+        '<p class="muted">Ask Duncan — it is one line on the staff screen he already uses. ' +
+        'Same login, no new password.</p>'
+      : '<p class="muted">Ask Duncan to switch this login back on in the staff portal.</p>') +
+    '<p></p><button class="btn secondary" id="again">Try again</button></div>';
+  el("again").onclick = () => afterSignIn();
 }
 
 function renderDays(){

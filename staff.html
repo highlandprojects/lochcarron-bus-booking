@@ -114,7 +114,6 @@
   <button data-tab="day" aria-selected="true">The day</button>
   <button data-tab="take" aria-selected="false">Take a booking</button>
   <button data-tab="ring" aria-selected="false">To telephone</button>
-  <button data-tab="people" aria-selected="false" class="hidden">Who can use this</button>
 </nav>
 
 <main id="main"><div class="card">Loading…</div></main>
@@ -149,8 +148,8 @@
    cached or out of date; the functions it calls cannot be talked round.
 ===================================================================== */
 
-const SUPABASE_URL = "https://sswidsjglvpbbthsqwdy.supabase.co";
-const ANON_KEY = "sb_publishable_HYylK1k8WEtN3RC56zXNXA_ViLb3Zuw";
+const SUPABASE_URL = "https://wkyjsdiqnuknnkyavnyd.supabase.co";
+const ANON_KEY = "sb_publishable_y22lUaDRfZBvVoUHcwNb_Q_gSqw7Pa_";
 const STORE_KEY = "bus704.office.session";
 
 /* ------------------------------------------------------------------
@@ -307,7 +306,6 @@ const today = () => new Date().toISOString().slice(0, 10);
 
 const day = {date: today(), journeys: [], bookings: [], loading: false, message: null};
 const ring = {date: today(), rows: [], loaded: false};
-const people = {rows: [], loaded: false, message: null};
 
 const take = {
   date: today(),
@@ -488,13 +486,9 @@ function render(){
   Array.from(el("tabs").children).forEach(b => {
     b.setAttribute("aria-selected", String(b.dataset.tab === TAB));
   });
-  const peopleTab = el("tabs").querySelector('[data-tab="people"]');
-  peopleTab.classList.toggle("hidden", !(ME && ME.is_bus_administrator));
-
   if(TAB === "day") return renderDay();
   if(TAB === "take") return renderTake();
   if(TAB === "ring") return renderRing();
-  if(TAB === "people") return renderPeople();
 }
 
 function renderSignIn(){
@@ -504,8 +498,9 @@ function renderSignIn(){
   M().innerHTML =
     '<div class="card">' +
       '<h2>Sign in</h2>' +
-      '<p class="muted">This screen is for the garage. Customers book on ' +
-        '<a href="./">the public page</a>.</p>' +
+      '<p class="muted">Your usual Ross Group staff login — the same email address and ' +
+        'password you use for tyres, roadside and the rest. There is no separate bus ' +
+        'password.<br>Customers book on <a href="./">the public page</a>.</p>' +
       '<div id="signin-error"></div>' +
       '<label for="em">Email address</label>' +
       '<input id="em" type="email" autocomplete="username" inputmode="email">' +
@@ -532,13 +527,24 @@ function renderSignIn(){
 
 function renderNoAccess(){
   el("tabs").classList.add("hidden");
+  const knocked = ME && ME.has_login_but_no_bus_access;
   M().innerHTML =
-    '<div class="card"><h2>Your account is not set up yet</h2>' +
-    '<p>You have signed in, but nobody has said what you are allowed to do, so this screen ' +
-    'is empty on purpose.</p>' +
-    '<p class="muted">Ask Duncan to add ' + esc(ME.email || "your email address") +
-    ' on the "Who can use this" screen. It takes him about ten seconds and you will not ' +
-    'need a new password.</p></div>';
+    '<div class="card"><h2>' +
+      (knocked ? 'Your login works, but it does not open the bus yet'
+               : 'Your account is not active') + '</h2>' +
+    (knocked
+      ? '<p>You are signed in to the Ross Group staff system as <strong>' +
+        esc(ME.name || ME.email || "") + '</strong>' +
+        (ME.job_role ? ' (' + esc(ME.job_role.replace(/_/g, " ")) + ')' : '') +
+        ', but nobody has switched the bus on for you.</p>' +
+        '<p class="muted">Ask Duncan. It is one line on the <strong>who can do what</strong> ' +
+        'screen he already uses for tyres and roadside — the bus is on it now as ' +
+        '<strong>Bus booking</strong>. You will not need a new password: this is the same ' +
+        'login you use for everything else.</p>'
+      : '<p>This login is not active on the staff system.</p>' +
+        '<p class="muted">Ask Duncan to switch it back on in the staff portal.</p>') +
+    '<p></p><button class="btn secondary wide" id="again">Try again</button></div>';
+  el("again").onclick = () => afterSignIn();
 }
 
 /* ---------------------------- The day ---------------------------- */
@@ -1106,74 +1112,6 @@ async function loadRing(){
   ring.loaded = true; render();
 }
 
-/* ------------------------ Who can use this ------------------------ */
-function renderPeople(){
-  let html = '<div class="card">' +
-    '<h2>Who can use this</h2>' +
-    '<p class="muted">Signing in does not by itself give anybody anything. A person can only ' +
-    'use the office screen if their email address is on this list and is allowed.</p>' +
-    '<h3>Add somebody</h3>' +
-    '<label for="pe">Their email address <span class="hint">The one they will sign in with. ' +
-      'It has to match exactly.</span></label>' +
-    '<input id="pe" type="email" placeholder="kay@example.com">' +
-    '<label for="pn">Their name</label><input id="pn" placeholder="Kay">' +
-    '<label for="pr">What they may do</label>' +
-    '<select id="pr">' +
-      '<option value="staff">Office — take, change and cancel bookings</option>' +
-      '<option value="read_only">Look only — see the day, change nothing</option>' +
-      '<option value="manager">Manager — everything except adding people</option>' +
-      '<option value="administrator">Administrator — everything, including this screen</option>' +
-    '</select>' +
-    '<p></p><button class="btn wide" id="padd">Add them</button>' +
-    '<div class="note">They still need a login. You make that in the Supabase dashboard: ' +
-    '<strong>Authentication → Users → Add user</strong>, with the same email address. Give them ' +
-    'the password face to face — never by text or email, and never write it in here.</div>';
-  if(people.message) html += '<div class="bad">' + esc(people.message) + '</div>';
-  html += '</div>';
-
-  if(people.loaded && people.rows.length){
-    html += '<div class="card"><table><thead><tr><th>Who</th><th>May do</th><th></th></tr></thead><tbody>' +
-      people.rows.map(r =>
-        '<tr><td><strong>' + esc(r.full_name || r.email) + '</strong><br>' +
-        '<span class="muted">' + esc(r.email) + '</span>' +
-        (r.has_signed_in ? '' : '<br><span class="chip warn">has never signed in</span>') +
-        (r.is_bus_administrator ? '<br><span class="chip">administrator</span>' : '') + '</td>' +
-        '<td>' + (r.is_allowed ? esc(r.portal_role) : '<span class="chip tel">no access</span>') + '</td>' +
-        '<td><button class="btn ' + (r.is_allowed ? "danger" : "secondary") + ' small" ' +
-          'data-email="' + esc(r.email) + '" data-allow="' + (!r.is_allowed) + '">' +
-          (r.is_allowed ? "Take access away" : "Let them in") + '</button></td></tr>').join("") +
-      '</tbody></table></div>';
-  }
-  M().innerHTML = html;
-
-  el("padd").onclick = async () => {
-    people.message = null;
-    try{
-      await rpc("bus_staff_set_invite", {
-        p_email: el("pe").value.trim(),
-        p_full_name: el("pn").value.trim() || null,
-        p_portal_role: el("pr").value,
-        p_is_allowed: true
-      });
-      await loadPeople();
-    }catch(e){ people.message = say(e); render(); }
-  };
-  M().querySelectorAll("[data-email]").forEach(b => {
-    b.onclick = async () => {
-      try{
-        await rpc("bus_staff_set_invite", {
-          p_email: b.dataset.email, p_is_allowed: b.dataset.allow === "true"});
-        await loadPeople();
-      }catch(e){ people.message = say(e); render(); }
-    };
-  });
-}
-async function loadPeople(){
-  try{ people.rows = await rpc("bus_staff_people", {}) || []; }
-  catch(e){ people.rows = []; people.message = say(e); }
-  people.loaded = true; render();
-}
-
 /* ------------------------------------------------------------------
    Start
 ------------------------------------------------------------------ */
@@ -1184,7 +1122,6 @@ el("tabs").onclick = e => {
   TAB = b.dataset.tab;
   if(TAB === "day") return loadDay();
   if(TAB === "ring") return loadRing();
-  if(TAB === "people") return loadPeople();
   render();
 };
 
