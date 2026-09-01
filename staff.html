@@ -778,7 +778,20 @@ function renderDay(){
           (DELAY[row.journey_id]
             ? '<button class="btn secondary small" data-ontime="' + esc(row.journey_id) + '">' +
               'It is running on time again</button>' : '') +
-        '</div>';
+          /* STAND DOWN. The other of the two buttons that reach customers
+             the instant they are pressed. Kept beside the run it belongs
+             to rather than at the bottom of the screen, so it can never be
+             pressed against the wrong journey. */
+          (row.journey_status === "cancelled"
+            ? '<button class="btn secondary small" data-backon="' + esc(row.journey_id) + '">' +
+              'Put this run back on</button>'
+            : '<button class="btn danger small" data-standdown="' + esc(row.journey_id) + '">' +
+              'Stand this run down</button>') +
+        '</div>' +
+        (row.journey_status === "cancelled"
+          ? '<div class="bad" style="margin-top:.6rem"><strong>This run is stood down.</strong> ' +
+            'Nobody should be booked onto it.</div>'
+          : '');
 
       if(!bks.length){
         html += '<p class="muted" style="margin:.7rem 0 0">Nobody booked yet.</p>';
@@ -833,6 +846,91 @@ function renderDay(){
   M().querySelectorAll("button[data-ontime]").forEach(btn => {
     btn.onclick = () => onTimeAgain(btn.dataset.ontime);
   });
+  M().querySelectorAll("button[data-standdown]").forEach(btn => {
+    btn.onclick = () => standDown(btn.dataset.standdown);
+  });
+  M().querySelectorAll("button[data-backon]").forEach(btn => {
+    btn.onclick = () => putBackOn(btn.dataset.backon);
+  });
+}
+
+/* --------------------- Standing a run down ---------------------
+   Two steps, deliberately, and in this order: the REASON is typed first,
+   and only then is the consequence shown and confirmed. It is not "Are
+   you sure?", which nobody reads - it is a sentence naming the exact run
+   and the exact number of PEOPLE who will be told the instant the button
+   works.
+
+   That sentence is built by the database, not here, so that this screen
+   and the till cannot word the same warning differently. */
+async function standDown(journeyId){
+  const why = window.prompt(
+    "Why is this run not going?\n\nThis goes out to every passenger, so say it the way you " +
+    "would on the telephone.\n\n\"The Bealach is closed\", \"the bus is off the road\".", "");
+  if(why === null) return;
+  if(!why.trim()){
+    window.alert("It needs a reason. That reason is what the passengers are told.");
+    return;
+  }
+
+  let pre;
+  try{
+    pre = await rpc("bus_stand_down_preview", {p_journey_id: journeyId});
+  }catch(e){ window.alert(say(e, "changed")); return; }
+  if(!pre || pre.ok === false){
+    window.alert(say({code: (pre && pre.reason) || "unknown"}, "changed"));
+    return;
+  }
+  if(pre.journey && pre.journey.already_cancelled){
+    window.alert("That run is already stood down.");
+    await loadDay();
+    return;
+  }
+
+  /* The database's own sentence, word for word. */
+  if(!window.confirm(pre.sentence +
+      "\n\nThey are texted and emailed the moment you press OK." +
+      (Number(pre.must_be_telephoned) > 0
+        ? "\n\n" + pre.must_be_telephoned + " of them have no mobile and no email. They will " +
+          "appear on the \"To telephone\" list and somebody has to ring them."
+        : ""))) return;
+
+  try{
+    const r = await rpc("bus_stand_down",
+      {p_journey_id: journeyId, p_reason: why.trim(), p_confirmed: true});
+    if(r && r.ok === false){
+      window.alert(r.message || say({code: r.reason}, "changed"));
+      return;
+    }
+    await loadDay();
+    window.alert((r && r.message) || "The run is stood down and everybody has been told.");
+  }catch(e){ window.alert(say(e, "changed")); }
+}
+
+async function putBackOn(journeyId){
+  /* The subtle half, and the reason a naive undo would have been worse
+     than none: some of those messages have not gone out yet. Those are
+     WITHDRAWN, not answered - that person never knew there was a problem,
+     and telling them the bus is running after all would invent a worry
+     they never had. The database does this; the screen says so first. */
+  if(!window.confirm(
+      "Put this run back on?\n\nAnybody who was already TOLD it was off gets the good news. " +
+      "Anybody whose message had not gone out yet is told nothing at all — they never knew " +
+      "there was a problem, and telling them now would only worry them.")) return;
+  const why = window.prompt(
+    "Why is it back on? (for the record — this is not sent to anybody)",
+    "Put back on in error");
+  if(why === null) return;
+  try{
+    const r = await rpc("bus_reinstate_journey",
+      {p_journey_id: journeyId, p_reason: why.trim() || null});
+    if(r && r.ok === false){
+      window.alert(r.message || say({code: r.reason}, "changed"));
+      return;
+    }
+    await loadDay();
+    window.alert((r && r.message) || "The run is back on.");
+  }catch(e){ window.alert(say(e, "changed")); }
 }
 
 /* ------------------------ Running late ------------------------
