@@ -2,174 +2,389 @@
 <html lang="en-GB">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#164a6d">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Service 704 — the driver</title>
+<!-- The real map. It is the SECOND map on this screen, never the first:
+     the strip map above it is drawn on the phone and needs no network at
+     all, and that is what he gets over the Bealach. This one is for the
+     places that are not a named stop - somebody who pinned a spot on the
+     road when they booked - because those cannot be a dot on a strip map
+     and he genuinely does not know where they are. If it fails to load,
+     the strip map and the list are both still there. -->
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/4.7.1/maplibre-gl.min.css">
 <style>
+  /* =====================================================================
+     Built for a phone, held in one hand, at a road end, in the rain.
+     ---------------------------------------------------------------------
+     Every choice here comes from one fact: THERE IS NO SIGNAL on the
+     coast road, over the Bealach, or between Shieldaig and Kishorn. The
+     whole day loads before he leaves and nothing after that needs a
+     network.
+
+     So: no web fonts, no icon libraries, no map tiles, no images. Large
+     type because it is read at arm's length on a dashboard. High contrast
+     because it is read in bright sun and in the dark. Big targets because
+     it is tapped with cold hands.
+     ================================================================== */
   :root{
-    --ink:#121c25; --ink-soft:#4a6272; --line:#c2d0d9; --paper:#fff; --wash:#eaf0f4;
-    --blue:#1f5f8b; --blue-dark:#164a6d; --blue-wash:#e6f0f7;
-    --green:#16663f; --green-wash:#e2f1e9;
-    --red:#9c2018; --red-wash:#fbeae8;
-    --amber:#a86c00; --amber-wash:#fdf2df;
+    --ink:#11191f; --ink-soft:#4a5f6d; --line:#c3d0d8; --paper:#fff;
+    --wash:#eef2f5; --blue:#1f5f8b; --blue-dark:#164a6d; --blue-wash:#e7f0f6;
+    --green:#146b3f; --green-wash:#e4f3ea; --amber-wash:#fdf1dd;
+    --amber-line:#b57a12; --amber-ink:#6b4703;
+    --red:#8f1b1b; --red-wash:#fbe9e9;
   }
-  *{box-sizing:border-box; -webkit-tap-highlight-color:rgba(31,95,139,.15)}
-  html{-webkit-text-size-adjust:100%}
-  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
-       color:var(--ink);background:var(--wash);font-size:18px;line-height:1.45}
-  header{background:var(--blue-dark);color:#fff;padding:.7rem .9rem;
-         padding-top:calc(.7rem + env(safe-area-inset-top));
-         display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;position:sticky;top:0;z-index:10}
-  header h1{margin:0;font-size:1rem;font-weight:600;flex:1 1 auto}
-  header button, header a.hbtn{font:inherit;font-size:.85rem;background:rgba(255,255,255,.16);
-                color:#fff;text-decoration:none;border:1px solid rgba(255,255,255,.45);
-                border-radius:8px;padding:.35rem .8rem;cursor:pointer;display:inline-block}
-  .banner{padding:.6rem .9rem;font-size:.95rem;font-weight:600;text-align:center}
-  .banner.off{background:var(--amber-wash);color:#7a4f00;border-bottom:2px solid var(--amber)}
-  .banner.queued{background:var(--blue-wash);color:var(--blue-dark);border-bottom:2px solid var(--blue)}
-  main{max-width:760px;margin:0 auto;padding:.8rem;
-       padding-bottom:calc(4rem + env(safe-area-inset-bottom))}
-  .card{background:var(--paper);border:1px solid var(--line);border-radius:14px;
-        padding:.9rem;margin-bottom:.8rem}
-  h2{margin:0 0 .5rem;font-size:1.05rem;color:var(--blue-dark)}
-  label{display:block;font-weight:600;font-size:.95rem;margin:.7rem 0 .25rem}
-  input,select{font:inherit;width:100%;padding:.7rem;border:2px solid var(--line);
-               border-radius:10px;min-height:52px;background:var(--paper);color:var(--ink)}
-  .btn{font:inherit;font-weight:700;min-height:56px;border-radius:12px;cursor:pointer;
-       border:2px solid var(--blue);background:var(--blue);color:#fff;padding:.5rem 1rem;
-       display:inline-flex;align-items:center;justify-content:center;gap:.4rem;width:100%}
-  .btn.secondary{background:var(--paper);color:var(--blue)}
-  .btn.ghost{background:transparent;border-color:var(--line);color:var(--ink-soft);
-             min-height:44px;font-weight:600;font-size:.9rem}
-  .btn[disabled]{opacity:.45}
-  .daybtn{display:flex;align-items:center;justify-content:space-between;gap:.6rem;
-          width:100%;text-align:left;font:inherit;background:var(--paper);
-          border:2px solid var(--line);border-radius:12px;padding:.8rem;margin-bottom:.5rem;
-          min-height:64px;cursor:pointer}
-  .daybtn strong{font-size:1.1rem}
-  .daybtn .n{font-size:1.5rem;font-weight:800;color:var(--blue)}
-  .daybtn.today{border-color:var(--blue)}
-  .daybtn.down{background:var(--red-wash);border-color:var(--red)}
-  .pick{display:flex;gap:.5rem;margin:.6rem 0}
-  .pick button{flex:1;min-height:60px;font:inherit;font-size:1rem;font-weight:700;cursor:pointer;
-               border:2px solid var(--line);background:var(--paper);color:var(--blue);border-radius:12px}
-  .pick button[aria-pressed="true"]{background:var(--blue);color:#fff;border-color:var(--blue)}
-  .pax{background:var(--paper);border:2px solid var(--line);border-radius:14px;
-       padding:.85rem;margin-bottom:.7rem}
-  .pax.on{border-color:var(--green);background:var(--green-wash)}
-  .pax.off{border-color:var(--red);background:var(--red-wash)}
-  .pax .stop{font-size:1.25rem;font-weight:800;color:var(--blue-dark);line-height:1.2}
-  .pax .time{float:right;font-size:1.25rem;font-weight:800;color:var(--blue-dark)}
-  .pax .name{font-size:1.15rem;font-weight:700;margin-top:.15rem}
-  .pax .sub{font-size:.92rem;color:var(--ink-soft)}
-  .pax .flags{display:flex;gap:.35rem;flex-wrap:wrap;margin:.4rem 0 0}
-  .flag{font-size:.8rem;font-weight:700;padding:.15rem .55rem;border-radius:20px;
-        background:var(--blue-wash);color:var(--blue-dark)}
-  .flag.warn{background:var(--amber-wash);color:var(--amber)}
-  .flag.bad{background:var(--red-wash);color:var(--red)}
-  .pax .acts{display:flex;gap:.5rem;margin-top:.6rem}
-  .pax .acts button{flex:1;min-height:56px;font:inherit;font-size:1rem;font-weight:700;
-                    border-radius:12px;cursor:pointer;border:2px solid var(--line);
-                    background:var(--paper);color:var(--ink)}
-  .pax .acts button.yes[aria-pressed="true"]{background:var(--green);color:#fff;border-color:var(--green)}
-  .pax .acts button.no[aria-pressed="true"]{background:var(--red);color:#fff;border-color:var(--red)}
-  /* Ringing a passenger is a THUMB-SIZED action, not a link in a paragraph.
-     The driver is at a road end in the rain with nobody there; finding a
-     small blue number among five other lines is not a way to make a call. */
-  .pax .acts a.ring{flex:1;min-height:56px;display:flex;align-items:center;justify-content:center;
-                    gap:.4rem;font-size:1rem;font-weight:700;border-radius:12px;
-                    border:2px solid var(--blue);background:var(--paper);color:var(--blue);
-                    text-decoration:none}
-  .pax .acts a.ring:active{background:var(--blue);color:#fff}
-  .pax .acts a.ring svg{width:19px;height:19px;fill:currentColor;flex:none}
-  .noring{flex:1;min-height:56px;display:flex;align-items:center;justify-content:center;
-          text-align:center;font-size:.9rem;font-weight:600;border-radius:12px;
-          border:2px dashed var(--line);color:var(--ink-soft);padding:.3rem .5rem;line-height:1.2}
-  .tel{display:inline-block;font-weight:700;color:var(--blue);text-decoration:none;
-       padding:.15rem 0}
-  .note{background:var(--amber-wash);border-left:5px solid var(--amber);padding:.6rem .8rem;
-        border-radius:0 8px 8px 0;margin:.6rem 0;font-size:.95rem}
-  .bad{background:var(--red-wash);border-left:5px solid var(--red);padding:.6rem .8rem;
-       border-radius:0 8px 8px 0;margin:.6rem 0}
-  .good{background:var(--green-wash);border-left:5px solid var(--green);padding:.6rem .8rem;
-        border-radius:0 8px 8px 0;margin:.6rem 0}
-  .muted{color:var(--ink-soft);font-size:.9rem}
-  .stick{position:fixed;left:0;right:0;bottom:0;padding:.6rem .8rem;
-         padding-bottom:calc(.6rem + env(safe-area-inset-bottom));
-         background:rgba(255,255,255,.96);border-top:1px solid var(--line);
-         display:flex;gap:.5rem;max-width:760px;margin:0 auto}
-  .stick .btn{min-height:52px}
-  .card.changed{border-left:5px solid var(--amber)}
-  .seatline{display:inline-block;font-size:.85rem;font-weight:700;color:var(--green);
-            background:var(--green-wash);border-radius:999px;padding:.1rem .5rem;margin-top:.25rem}
-  .seatline.low{color:var(--amber);background:var(--amber-wash)}
-  .seatline.gone{color:var(--red);background:var(--red-wash)}
-  /* The run on a map. Tall, because it is looked at on a phone held in
-     one hand at the side of a road. */
-  .runmap{height:64vh;min-height:340px;border:1px solid var(--line);border-radius:12px;
-          overflow:hidden;background:var(--wash)}
-  .runmap .maplibregl-map{height:100%;width:100%}
-  .pinlabel{background:var(--blue);color:#fff;font-weight:700;font-size:.85rem;
-            border-radius:999px;min-width:26px;height:26px;display:flex;align-items:center;
-            justify-content:center;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4)}
-  .pinlabel.done{background:var(--green)}
-  .pinlabel.gone{background:var(--red)}
-  .btn.small{min-height:44px;font-size:.95rem;margin-top:.5rem}
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html{-webkit-text-size-adjust:100%;}
+  body{margin:0; background:var(--wash); color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
+    font-size:18px; line-height:1.45;}
+
+  .demo{background:var(--amber-wash); border-bottom:2px solid var(--amber-line);
+    padding:.6rem .9rem; font-size:.8rem; text-align:center; color:var(--amber-ink);}
+
+  header{background:var(--blue); color:#fff; padding:.9rem 1rem .8rem;
+    position:sticky; top:0; z-index:20;}
+  header h1{margin:0; font-size:1.15rem; font-weight:700;}
+  header .day{margin:.15rem 0 0; font-size:1.35rem; font-weight:800;}
+  header .meta{margin:.3rem 0 0; font-size:.82rem; opacity:.9;}
+
+  /* Offline state. Not an error — the normal condition on this route. */
+  .conn{display:flex; align-items:center; gap:.4rem; font-size:.8rem;
+    margin-top:.45rem; padding:.3rem .55rem; border-radius:20px;
+    background:rgba(255,255,255,.16); width:fit-content;}
+  .conn.off{background:#5c4a00; color:#ffe9a8;}
+
+  main{padding:.8rem .8rem 5rem; max-width:640px; margin:0 auto;}
+
+  .legs{display:flex; gap:.4rem; margin:0 0 .9rem;}
+  .legs button{flex:1; font:inherit; font-weight:700; font-size:1rem;
+    padding:.75rem .5rem; min-height:56px; border:2px solid var(--line);
+    border-radius:11px; background:var(--paper); color:var(--ink-soft);}
+  .legs button[aria-selected="true"]{background:var(--blue); color:#fff;
+    border-color:var(--blue);}
+  .legs .n{display:block; font-size:.78rem; font-weight:600; opacity:.85;}
+
+  .tally{background:var(--paper); border:1px solid var(--line); border-radius:11px;
+    padding:.7rem .85rem; margin-bottom:.85rem; font-size:.95rem;}
+  .tally b{font-size:1.15rem;}
+
+  .banner{border-radius:11px; padding:.8rem .9rem; margin-bottom:.85rem;
+    font-size:.95rem;}
+  .banner.down{background:var(--red); color:#fff;}
+  .banner.down .h{font-weight:800; font-size:1.05rem; display:block; margin-bottom:.2rem;}
+  .banner.trailer{background:var(--amber-wash); border:2px solid var(--amber-line);
+    color:var(--amber-ink); font-weight:700;}
+
+  /* One passenger. Everything on it, because he cannot fetch more. */
+  .stop{background:var(--paper); border:1px solid var(--line); border-left:7px solid var(--blue);
+    border-radius:11px; padding:.85rem .9rem; margin-bottom:.75rem;}
+  .stop.boarded{border-left-color:var(--green); background:var(--green-wash);}
+  .stop.noshow{border-left-color:var(--ink-soft); background:#f4f6f7; opacity:.72;}
+  .stop.nottold{border-left-color:var(--red);}
+
+  .stop .time{font-size:1.6rem; font-weight:800; line-height:1;}
+  .stop .place{font-size:1.12rem; font-weight:700; margin:.2rem 0 0;}
+  .stop .detail{font-size:.95rem; color:var(--ink-soft); margin:.2rem 0 0;}
+  .stop .who{margin:.55rem 0 0; font-size:1.05rem; font-weight:700;}
+  .stop .with{font-size:.95rem; color:var(--ink-soft); margin:.1rem 0 0;}
+  /* RINGING THEM. A thumb at a road end in the rain, not a mouse — so it
+     is a button of at least 44px, never a line of text with a number in
+     it, and never a dead link when there is no number to dial. */
+  .stop .tel{display:inline-block; margin:.5rem 0 0; font-size:1.25rem; font-weight:800;
+    color:var(--blue); text-decoration:none; padding:.55rem .8rem;
+    min-height:44px; line-height:1.5; box-sizing:border-box;
+    border:2px solid var(--blue); border-radius:9px;}
+  /* NO NUMBER. It says so, and says what to do instead. A button that
+     dials nothing is worse than no button: he taps it at the road end,
+     nothing happens, and he does not know whether the phone or the
+     booking is at fault. */
+  .stop .noring{display:inline-block; margin:.5rem 0 0; font-size:1rem;
+    font-weight:700; color:var(--muted); padding:.55rem .8rem; min-height:44px;
+    box-sizing:border-box; border:2px dashed var(--line); border-radius:9px;}
+  .head{display:flex; justify-content:space-between; align-items:flex-start; gap:.7rem;}
+  .count{background:var(--blue); color:#fff; border-radius:9px; font-weight:800;
+    font-size:1.35rem; padding:.25rem .6rem; min-width:2.4rem; text-align:center;}
+
+  .flag{display:block; margin:.55rem 0 0; padding:.5rem .65rem; border-radius:8px;
+    font-size:.93rem; font-weight:700;}
+  .flag.req{background:var(--amber-wash); border:1px solid var(--amber-line); color:var(--amber-ink);}
+  .flag.note{background:var(--blue-wash); border:1px solid #b9d3e6; color:#1b3d55; font-weight:400;}
+  .flag.ovr{background:var(--red-wash); border:1px solid var(--red); color:var(--red);}
+  .flag.nottold{background:var(--red); color:#fff;}
+
+  .taps{display:flex; gap:.5rem; margin:.7rem 0 0;}
+  .taps button{flex:1; font:inherit; font-weight:700; min-height:52px;
+    border-radius:10px; border:2px solid var(--line); background:var(--paper);
+    color:var(--ink-soft); font-size:.98rem;}
+  .taps button.on{background:var(--green); border-color:var(--green); color:#fff;}
+  .taps button.onno{background:var(--ink-soft); border-color:var(--ink-soft); color:#fff;}
+  .undo{margin:.5rem 0 0; font-size:.9rem; text-align:center;}
+  .undo button{background:none; border:none; font:inherit; color:var(--blue);
+    text-decoration:underline; padding:.4rem; min-height:44px;}
+
+  .empty{background:var(--paper); border:1px dashed var(--line); border-radius:11px;
+    padding:1.4rem 1rem; text-align:center; color:var(--ink-soft);}
+
+  .simple .taps, .simple .undo{display:none;}
+  .modebar{position:fixed; left:0; right:0; bottom:0; background:var(--paper);
+    border-top:1px solid var(--line); padding:.55rem .8rem;
+    display:flex; align-items:center; justify-content:space-between; gap:.7rem;
+    font-size:.9rem; z-index:20;}
+  .modebar button{font:inherit; font-weight:700; min-height:46px; padding:.45rem .9rem;
+    border-radius:9px; border:2px solid var(--blue); background:var(--paper);
+    color:var(--blue-dark);}
+  /* THE DAYS. Today first, then the next operating days. Scrolls sideways
+     rather than wrapping, so today never moves off the left. */
+  .days{display:flex; gap:.4rem; overflow-x:auto; padding:0 0 .45rem;
+    margin:0 0 .85rem; -webkit-overflow-scrolling:touch;}
+  .days button{flex:0 0 auto; min-width:5.6rem; font:inherit; text-align:center;
+    padding:.5rem .5rem; min-height:66px; border:2px solid var(--line);
+    border-radius:11px; background:var(--paper); color:var(--ink-soft);}
+  .days button.on{background:var(--blue-dark); border-color:var(--blue-dark); color:#fff;}
+  .days .dn{display:block; font-weight:800; font-size:.95rem;}
+  .days .dd{display:block; font-size:.8rem;}
+  .days .dc{display:block; font-size:.78rem; opacity:.85;}
+  /* HAVE YOU GOT SPACE. The answer a passenger asks the driver for, on
+     the tab he is already looking at. Green because "yes" is the common
+     answer and it should read as one. */
+  .days .ds{display:block; font-size:.78rem; font-weight:800; color:var(--green);}
+  .days .ds.low{color:var(--amber-ink);}
+  .days .ds.full{color:var(--red);}
+  .days button.on .ds{color:#bff0d4;}
+  .days button.on .ds.low{color:#ffe08a;}
+  .days button.on .ds.full{color:#ffc2c2;}
+  /* A DAY HE IS NOT DRIVING TODAY. He may look; he may not tick, record
+     a walk-on or finish it. Nothing that changes a bus that has not left. */
+  .lookonly .taps, .lookonly .undo, .lookonly .walkon,
+  .lookonly .latebtn, .lookonly .receiptbtn{display:none;}
+  .realbtn{width:100%; font:inherit; font-weight:700; min-height:48px;
+    border-radius:11px; border:2px solid var(--line); background:var(--paper);
+    color:var(--ink); margin:.5rem 0 0;}
+  .realmap{height:58vh; min-height:320px; border:1px solid var(--line);
+    border-radius:12px; overflow:hidden; margin:.6rem 0 0; background:#dfe8ee;}
+  .realmap .maplibregl-map{height:100%; width:100%;}
+  .pinlabel{background:var(--blue-dark); color:#fff; font-weight:800;
+    font-size:.85rem; border-radius:999px; min-width:26px; height:26px;
+    line-height:26px; text-align:center; border:2px solid #fff;
+    box-shadow:0 1px 4px rgba(0,0,0,.35); cursor:pointer;}
+  .pinlabel.done{background:var(--green);}
+  .pinlabel.gone{background:var(--red);}
+
+  /* SOMEBODY GOT ON.
+     He is stopped, the engine is running, somebody is standing on the
+     step. Two taps: open it, say how many. Where they got on is the
+     phone's job, and when the phone cannot manage it the record is still
+     kept and the place is filled in later, parked, with the handbrake on. */
+  .walkon{width:100%; font:inherit; font-weight:800; font-size:1.15rem;
+    min-height:74px; border-radius:12px; border:3px solid var(--green);
+    background:var(--green); color:#fff; margin:.1rem 0 1rem;}
+  .won{background:var(--paper); border:1px solid var(--line);
+    border-left:7px solid var(--green); border-radius:11px;
+    padding:.7rem .85rem; margin-bottom:.6rem;
+    display:flex; gap:.7rem; align-items:center; justify-content:space-between;}
+  .won.todo{border-left-color:var(--amber-line); background:var(--amber-wash);}
+  .won .wtime{font-size:.88rem; color:var(--ink-soft);}
+  .won .wwhere{font-size:1.05rem; font-weight:700;}
+  .won .wcount{background:var(--green); color:#fff; border-radius:9px; font-weight:800;
+    font-size:1.25rem; padding:.15rem .55rem; min-width:2.2rem; text-align:center;}
+  .won.todo .wcount{background:var(--amber-line);}
+  .won button{font:inherit; font-weight:700; min-height:46px; padding:.35rem .7rem;
+    border-radius:9px; border:2px solid var(--blue); background:var(--paper);
+    color:var(--blue-dark); font-size:.92rem; white-space:nowrap;}
+
+  /* The sheet that slides up. Bottom of the screen, because that is where
+     a thumb reaches on a phone propped on a dashboard. */
+  .sheet{position:fixed; inset:0; z-index:40; background:rgba(9,20,28,.55);
+    display:flex; align-items:flex-end;}
+  .sheet .inner{background:var(--paper); width:100%; max-height:92vh; overflow:auto;
+    border-radius:16px 16px 0 0; padding:1rem .9rem 1.3rem; max-width:640px; margin:0 auto;}
+  .sheet h2{margin:0 0 .15rem; font-size:1.3rem;}
+  .sheet p.sub{margin:0 0 .9rem; color:var(--ink-soft); font-size:.95rem;}
+  .pad{display:grid; grid-template-columns:repeat(3,1fr); gap:.6rem;}
+  .pad button{font:inherit; font-weight:800; font-size:2rem; min-height:86px;
+    border-radius:12px; border:2px solid var(--blue); background:var(--blue-wash);
+    color:var(--blue-dark);}
+  .pad button.more{font-size:1rem; font-weight:700;}
+  .cancel{width:100%; margin-top:.9rem; font:inherit; font-weight:700; min-height:56px;
+    border-radius:11px; border:2px solid var(--line); background:var(--paper);
+    color:var(--ink-soft);}
+  .places{list-style:none; margin:0; padding:0;}
+  .places li{margin-bottom:.5rem;}
+  .places button{width:100%; text-align:left; font:inherit; min-height:60px;
+    padding:.55rem .8rem; border-radius:11px; border:2px solid var(--line);
+    background:var(--paper); color:var(--ink); font-weight:700; font-size:1.02rem;}
+  .places button.primary{border-color:var(--green); background:var(--green-wash);}
+  .places .m{display:block; font-weight:400; font-size:.87rem; color:var(--ink-soft);}
+
+  /* THE MAP. Drawn on the phone from the stop list — no tiles, no images,
+     nothing fetched. It works in the Bealach with the aerial off. */
+  .mapbtn{width:100%; font:inherit; font-weight:700; min-height:54px;
+    border-radius:11px; border:2px solid var(--blue); background:var(--paper);
+    color:var(--blue-dark); margin:0 0 .85rem;}
+  .mapbtn.on{background:var(--blue); color:#fff;}
+  .mapbox{background:var(--paper); border:1px solid var(--line); border-radius:11px;
+    padding:.6rem .5rem .75rem; margin:0 0 .9rem;}
+  .mapbox p.cap{margin:.1rem .3rem .5rem; font-size:.86rem; color:var(--ink-soft);}
+  .mapbox .sel{margin:.55rem .2rem 0; padding:.65rem .75rem; border-radius:9px;
+    background:var(--blue-wash); font-size:.97rem;}
+  .mapbox .sel b{display:block; font-size:1.05rem;}
+  .mapbox .sel button{margin-top:.55rem; font:inherit; font-weight:700; min-height:48px;
+    padding:.4rem .8rem; border-radius:9px; border:2px solid var(--green);
+    background:var(--green); color:#fff;}
+
+  /* FINISHING THE DAY.
+     Handbrake on, at Applecross, or on the settee that evening. Nothing
+     here is done while moving, so it can afford to be a list of questions
+     rather than one enormous button. */
+  /* RUNNING LATE. Beside the walk-on button, because they are the two
+     things he does from the road and both happen stopped. Amber not red:
+     late is not cancelled. */
+  /* THE RECEIPT. Blue rather than green or amber: it is neither a
+     passenger nor a problem, it is paperwork that used to travel to the
+     office stapled to a sheet. */
+  .receiptbtn{width:100%; font:inherit; font-weight:800; font-size:1.08rem;
+    min-height:64px; border-radius:12px; border:3px solid var(--blue);
+    background:var(--paper); color:var(--blue-dark); margin:0 0 1rem;}
+  .receiptbtn .sub{display:block; font-size:.82rem; font-weight:600;
+    color:var(--ink-soft); margin-top:.15rem;}
+  .shot{background:var(--paper); border:1px solid var(--line);
+    border-left:7px solid var(--blue); border-radius:11px;
+    padding:.6rem .8rem; margin-bottom:.55rem; display:flex; gap:.7rem;
+    align-items:center; justify-content:space-between;}
+  .shot .thumb{width:46px; height:46px; border-radius:8px; background:var(--blue-wash);
+    border:1px solid #b9d3e6; display:flex; align-items:center; justify-content:center;
+    font-size:1.4rem; flex:0 0 auto;}
+  .shot .m{font-size:.87rem; color:var(--ink-soft);}
+  .latebtn{width:100%; font:inherit; font-weight:800; font-size:1.08rem;
+    min-height:64px; border-radius:12px; border:3px solid var(--amber-line);
+    background:var(--amber-wash); color:var(--amber-ink); margin:0 0 1rem;}
+  .latebtn.on{background:var(--amber-line); color:#fff;}
+  .finishbtn{width:100%; font:inherit; font-weight:800; font-size:1.08rem;
+    min-height:66px; border-radius:12px; border:2px solid var(--blue-dark);
+    background:var(--blue-dark); color:#fff; margin:1.2rem 0 .3rem;}
+  .finishbtn .sub{display:block; font-size:.82rem; font-weight:600; opacity:.9;}
+  .finishbtn.done{background:var(--paper); color:var(--green);
+    border-color:var(--green);}
+  /* The sign-in button is its OWN class. It borrowed .finishbtn once and
+     the test that counts "is there a Finish the day button" then found
+     two - a screen class must belong to one screen. */
+  /* The sign-in CARD is its own class too, for the same reason as the
+     button below it: .stop belongs to a passenger, and a screen class
+     borrowed by another screen turns every honest count of passengers
+     into a wrong one. Third time this exact mistake was made. */
+  .signincard{background:var(--paper); border:1px solid var(--line);
+    border-left:7px solid var(--blue); border-radius:13px;
+    padding:.9rem 1rem 1rem; margin-bottom:.8rem;}
+  .signinbtn{width:100%; font:inherit; font-weight:800; font-size:1.08rem;
+    min-height:66px; border-radius:12px; border:2px solid var(--blue-dark);
+    background:var(--blue-dark); color:#fff; margin:1.2rem 0 .3rem;}
+  .frow{background:var(--paper); border:1px solid var(--line);
+    border-left:7px solid var(--amber-line); border-radius:11px;
+    padding:.7rem .85rem; margin-bottom:.6rem;}
+  .frow.ok{border-left-color:var(--green); background:var(--green-wash);}
+  /* AS BOOKED is the normal case, so it must not shout. Seven green boxes
+     read as seven things done; they are seven things that never needed
+     doing. Plain white, quiet button, and the exceptions stand out. */
+  .frow.asbooked{border-left-color:var(--line); background:var(--paper);}
+  .frow.asbooked .q{font-weight:600; font-size:1rem;}
+  .frow.asbooked button{min-height:44px; font-size:.88rem; font-weight:600;
+    border-width:1px; border-color:var(--line); color:var(--ink-soft);}
+  .frow .q{font-size:1.05rem; font-weight:700; margin:0 0 .1rem;}
+  .frow .sub{font-size:.88rem; color:var(--ink-soft); margin:0;}
+  .frow button{margin-top:.55rem; width:100%; font:inherit; font-weight:700;
+    min-height:52px; border-radius:10px; border:2px solid var(--blue);
+    background:var(--paper); color:var(--blue-dark); font-size:.98rem;}
+  .frow.ok button{border-color:var(--line); color:var(--ink-soft);}
+  .fhead{background:var(--blue-wash); border:1px solid #b9d3e6; border-radius:11px;
+    padding:.75rem .9rem; margin:0 0 .9rem; font-size:.95rem;}
+  .fhead b{display:block; font-size:1.1rem; margin-bottom:.15rem;}
+  .fdone{background:var(--green-wash); border:2px solid var(--green);
+    border-radius:11px; padding:1.1rem .9rem; margin:0 0 .9rem;
+    text-align:center; color:var(--green); font-weight:700;}
+  .backlist{width:100%; font:inherit; font-weight:700; min-height:56px;
+    border-radius:11px; border:2px solid var(--line); background:var(--paper);
+    color:var(--ink-soft); margin-top:.4rem;}
   .hidden{display:none !important}
+  footer{text-align:center; color:var(--ink-soft); font-size:.82rem; padding:.5rem 0 1rem;}
 </style>
 </head>
 <body>
 
+<div class="demo hidden" id="offlinebanner"></div>
+
+<div id="signin" class="hidden"></div>
+
 <header>
-  <h1 id="title">Service 704 — the driver</h1>
-  <button id="back" class="hidden">Back</button>
-  <a class="hbtn" href="home.html">Screens</a>
-  <button id="signout" class="hidden">Sign out</button>
+  <h1>704 Driver Sheet</h1>
+  <p class="day" id="day">—</p>
+  <p class="meta" id="meta">—</p>
+  <div class="conn" id="conn">—</div>
 </header>
-<div id="banner"></div>
-<main id="main"><div class="card">Loading…</div></main>
+
+<main id="app"></main>
+
+<div class="modebar">
+  <span id="modetext">—</span>
+  <button id="modebtn">—</button>
+</div>
+
+<footer>Lochcarron Garage &middot; 01520 722997</footer>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/4.7.1/maplibre-gl.min.js"></script>
 <script>
-"use strict";
 /* =====================================================================
-   The driver's screen.
+   704 driver sheet
+   ---------------------------------------------------------------------
+   THE ONE IDEA: no signal. The whole day is loaded before he leaves and
+   nothing after that needs a network. Taps are held and sent when there
+   is coverage; until then they are on the screen and on the phone.
 
-   Written for a phone held in one hand at a road end, and for the fact
-   that this route has no signal for miles at a time. Three consequences,
-   and everything else follows from them:
+   NOTHING IS EVER REQUIRED. Simple mode asks for no taps at all, and a
+   driver who taps nothing all day has used this correctly. That is not a
+   concession, it is the design — the reports are built to work without a
+   single tap, because on this route they have to be.
+   ===================================================================== */
+/* =====================================================================
+   THE REAL DATA LAYER
+   =====================================================================
+   Everything above this point, and everything below it, is the July
+   prototype exactly as it was designed. This middle section is the only
+   part that is new: it replaces the prototype's sample data with the
+   live database, and it does so by producing THE SAME SHAPES the
+   prototype's screen already reads.
 
-   1. IT MUST WORK WITH NO SIGNAL. The day's sheet is kept in the phone
-      the moment it is fetched. Every tap is written to a queue in the
-      phone FIRST and sent afterwards, so a tap never depends on there
-      being a bar. Nothing is ever lost by driving into a glen.
+   That is deliberate and it is the lesson of the whole week. The last
+   attempt at this screen was built from scratch and drifted away from the
+   design a piece at a time until the operator said it had all been
+   changed. This one keeps the design and changes the data underneath, so
+   the design cannot drift.
 
-   2. A TAP MUST NEVER PUNISH THE DRIVER. Tapping twice is harmless.
-      Tapping the wrong one is undoable. If the driver taps nothing all
-      day he has used the system correctly - the taps are evidence for
-      the Council return, not a duty.
+   The prototype's screen needs exactly five things:
 
-   3. IT MUST SAY HOW OLD IT IS. A sheet fetched three hours ago may not
-      know about a cancellation. The screen says so rather than looking
-      confident.
-===================================================================== */
+     STOPS       every stop, by direction, in route order
+     DAYS        the operating days, today first
+     SHEETS      one full day sheet per day: {outward:[...], return:[...]}
+     DAYRUNS     whether each run is stood down, per day
+     TODAY_RUNS  whether the bus runs at all today
+
+   Everything else it works out for itself.
+   ===================================================================== */
 
 const SUPABASE_URL = "https://wkyjsdiqnuknnkyavnyd.supabase.co";
-const ANON_KEY = "sb_publishable_y22lUaDRfZBvVoUHcwNb_Q_gSqw7Pa_";
+const SUPABASE_KEY = "sb_publishable_y22lUaDRfZBvVoUHcwNb_Q_gSqw7Pa_";
+
 const K = {
-  session: "bus704.driver.session",
-  queue:   "bus704.driver.queue",
-  sheet:   "bus704.driver.sheet",
-  days:    "bus704.driver.days",
-  route:   "bus704.driver.route"
+  session:  "bus704.driver.session",
+  queue:    "bus704.driver.queue",
+  sheets:   "bus704.driver.sheets",
+  stops:    "bus704.driver.stops",
+  stopids:  "bus704.driver.stopids",
+  walkons:  "bus704.driver.walkonids"
 };
 
-/* ------------------------------------------------------------------
-   The phone's own memory. Wrapped, because a browser in private mode
-   throws rather than returning nothing, and losing the screen to that
-   would be absurd.
------------------------------------------------------------------- */
+/* The phone's own memory. Wrapped, because a browser in private mode
+   throws rather than returning nothing, and losing the day to that would
+   be absurd. */
 function keep(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(_){} }
 function recall(k, d){
   try{ const s = localStorage.getItem(k); return s ? JSON.parse(s) : d; }catch(_){ return d; }
@@ -178,747 +393,1065 @@ function forget(k){ try{ localStorage.removeItem(k); }catch(_){} }
 
 let SESSION = recall(K.session, null);
 let ME = null;
-let ONLINE = navigator.onLine !== false;
-let QUEUE = recall(K.queue, []);
-let flushing = false;
+
+/* The five things the screen needs. Empty until the day is fetched, and
+   then filled from what the phone remembers if there is no signal. */
+let STOPS      = recall(K.stops, {outward: [], return: []});
+
+/* The screen works in PLACE NAMES, because that is what Malcolm says and
+   what the prototype was designed around. The database works in ids. This
+   is the one place the two meet, and it is kept on the phone with the
+   stop list so that answering "where did they get off" still records the
+   right stop with no signal. */
+let STOP_ID    = recall(K.stopids, {});
+
+let DAYS       = [];
+let SHEETS     = [];
+let DAYRUNS    = [];
+let TODAY_RUNS = false;
+
+
+/* ------------------------------------------------------------------
+   The few things the screen needs that were in the sample-data block
+   ------------------------------------------------------------------
+   COORDS comes from the real stop list rather than being written down
+   here, so a stop that moves after Malcolm walks the route moves on the
+   map too.
+------------------------------------------------------------------ */
+const TODAY = new Date();
+
+/* Past this the phone is guessing rather than knowing, and the record is
+   flagged for somebody to look at rather than quietly filed as fact. */
+const TOO_FAR_METRES = 400;
+
+let COORDS = recall("bus704.driver.coords", {});
+
+function metresBetween(a, b, c, d){
+  const R=6371000, r=Math.PI/180;
+  const dLat=(c-a)*r, dLon=(d-b)*r;
+  const h=Math.sin(dLat/2)**2 + Math.cos(a*r)*Math.cos(c*r)*Math.sin(dLon/2)**2;
+  return Math.round(2*R*Math.asin(Math.sqrt(h)));
+}
+function nearestStops(lat, lon, leg){
+  return (STOPS[leg] || [])
+    .filter(n => COORDS[n])
+    .map(n => ({name:n, metres: metresBetween(lat, lon, COORDS[n][0], COORDS[n][1])}))
+    .sort((p,q) => p.metres - q.metres)
+    .slice(0,5);
+}
 
 /* ------------------------------------------------------------------
    Talking to the database
 ------------------------------------------------------------------ */
-async function authPost(grant, body){
-  const r = await fetch(SUPABASE_URL + "/auth/v1/token?grant_type=" + grant, {
-    method: "POST", headers: {apikey: ANON_KEY, "Content-Type": "application/json"},
-    body: JSON.stringify(body)
-  });
-  const j = await r.json().catch(() => ({}));
-  if(!r.ok) throw new Error(j.error_description || j.msg || j.error || "sign_in_failed");
-  return {access_token: j.access_token, refresh_token: j.refresh_token,
-          expires_at: Date.now() + ((j.expires_in || 3600) - 60) * 1000};
-}
-function setSession(s){
-  SESSION = s;
-  if(s) keep(K.session, s); else forget(K.session);
-}
-async function token(){
-  if(!SESSION) throw new Error("not_signed_in");
-  if(SESSION.expires_at && Date.now() > SESSION.expires_at){
-    setSession(await authPost("refresh_token", {refresh_token: SESSION.refresh_token}));
-  }
-  return SESSION.access_token;
-}
 async function rpc(fn, args){
-  const t = await token();
   const r = await fetch(SUPABASE_URL + "/rest/v1/rpc/" + fn, {
     method: "POST",
-    headers: {apikey: ANON_KEY, Authorization: "Bearer " + t, "Content-Type": "application/json"},
+    headers: {
+      "content-type": "application/json",
+      "apikey": SUPABASE_KEY,
+      "authorization": "Bearer " + (SESSION ? SESSION.access_token : SUPABASE_KEY)
+    },
     body: JSON.stringify(args || {})
   });
-  if(r.status === 401){ setSession(null); ME = null; throw new Error("your_sign_in_has_run_out"); }
   const text = await r.text();
-  let body = null; try{ body = text ? JSON.parse(text) : null; }catch(_){}
+  let body = null;
+  try{ body = text ? JSON.parse(text) : null; }catch(_){ body = text; }
   if(!r.ok){
-    const e = new Error((body && body.message) || text || "request_failed");
-    e.code = body && body.message ? String(body.message) : "";
+    const e = new Error((body && (body.message || body.error)) || ("HTTP " + r.status));
+    e.code = (body && body.message) || String(r.status);
+    e.status = r.status;
     throw e;
   }
   return body;
 }
 
-const SAY = {
-  not_permitted: "Your account is not allowed to record anything. Ring the office.",
-  booking_not_found: "That booking is not on this sheet any more. Pull the sheet down again when you have signal.",
-  unknown_event: "Something is wrong with this screen — tell whoever set it up.",
-  your_sign_in_has_run_out: "Your sign-in has run out. Sign in again when you have signal.",
-  not_signed_in: "Please sign in."
-};
-function say(e){
-  const c = (e && e.code) || String((e && e.message) || e);
-  return SAY[c] || c;
+async function signIn(email, password){
+  const r = await fetch(SUPABASE_URL + "/auth/v1/token?grant_type=password", {
+    method: "POST",
+    headers: {"content-type": "application/json", "apikey": SUPABASE_KEY},
+    body: JSON.stringify({email: email, password: password})
+  });
+  const j = await r.json();
+  if(!r.ok) throw new Error(j.error_description || j.msg || "That did not work.");
+  SESSION = j;
+  keep(K.session, SESSION);
+  return j;
+}
+
+function say(err){
+  const code = (err && err.code) || String((err && err.message) || err);
+  if(/JWT|token|expired/i.test(code)) return "Your sign-in has run out. Please sign in again.";
+  if(/Failed to fetch|NetworkError|network/i.test(code))
+    return "No signal just now. What you have tapped is safe on the phone.";
+  return code;
 }
 
 /* ------------------------------------------------------------------
-   The queue. THIS is the offline story, and it is deliberately dull.
-
-   Every tap is appended here and rendered immediately. A separate loop
-   sends them. Each entry remembers WHEN THE DRIVER TAPPED, which is what
-   goes into the database as occurred_at - so a tap made at Shieldaig and
-   sent at Garve is recorded as having happened at Shieldaig.
+   Turning the database's rows into the prototype's shapes
+   ------------------------------------------------------------------
+   The prototype was designed against this same data, so this is a
+   rename, not a translation. Where a name differs it is because the
+   database calls the thing what the Council calls it and the screen
+   calls it what Malcolm calls it.
 ------------------------------------------------------------------ */
-function enqueue(fn, args){
+function prettyReqs(s){
+  if(!s) return null;
+  return String(s)
+    .replace(/folding_wheelchair/g, "folding wheelchair")
+    .replace(/walking_aid/g, "walking stick or frame")
+    .replace(/large_luggage/g, "large luggage")
+    .replace(/pushchair/g, "pushchair")
+    .replace(/_/g, " ");
+}
+function hhmmOf(t){
+  if(!t) return "—";
+  return String(t).slice(0, 5);
+}
+
+function toStop(r){
+  return {
+    ref:      r.reference,
+    bookingId: r.booking_id,
+    time:     hhmmOf(r.estimated_time || r.scheduled_time),
+    place:    r.pickup,
+    detail:   r.pickup_detail || null,
+    who:      r.lead_name,
+    with:     r.other_names || null,
+    party:    Number(r.party_size) || 1,
+    tel:      r.telephone || null,
+    texted:   r.can_be_texted !== false,
+    dest:     r.drop_off,
+    /* The stop they BOOKED to, as an id. Needed only to undo a
+       correction: putting somebody back to as-booked means recording the
+       booked stop again, and without the id the undo button silently
+       did nothing at all. */
+    destPointId: r.destination_point_id || null,
+    reqs:     prettyReqs(r.requirements),
+    trailer:  !!r.needs_trailer,
+    note:     r.driver_note || null,
+    ovr:      r.override_reason || null,
+    notTold:  !!r.not_told,
+    /* Already recorded as having got off somewhere other than booked. */
+    gotOff:   r.got_off_is_a_difference ? (r.got_off_at || null) : null,
+    lat:      r.pickup_latitude, lng: r.pickup_longitude,
+    boarded:  !!r.boarded, noShow: !!r.no_show,
+    journeyId: r.journey_id,
+    status:   r.journey_status
+  };
+}
+
+function sheetFromRows(rows){
+  const out = {outward: [], return: []};
+  (rows || []).forEach(r => {
+    const s = toStop(r);
+    (r.direction === "return" ? out.return : out.outward).push(s);
+  });
+  return out;
+}
+
+/* ------------------------------------------------------------------
+   Fetching the whole lot, once, before he leaves
+------------------------------------------------------------------ */
+async function loadEverything(){
+  /* The stop list changes about once a year, so the phone's copy is used
+     the moment there is no signal rather than leaving the map empty. */
+  try{
+    const [out, back] = await Promise.all([
+      rpc("bus_stops", {p_direction: "outward"}),
+      rpc("bus_stops", {p_direction: "return"})
+    ]);
+    STOPS = {
+      outward: (out || []).map(s => s.name),
+      return:  (back || []).map(s => s.name)
+    };
+    /* Where each stop actually is, for the map the phone draws itself and
+       for working out which stop a walk-on happened at. */
+    COORDS = {};
+    STOP_ID = {};
+    [].concat(out || [], back || []).forEach(s => {
+      if(s.latitude != null && s.longitude != null)
+        COORDS[s.name] = [Number(s.latitude), Number(s.longitude)];
+      if(s.id) STOP_ID[s.name] = s.id;
+    });
+    keep(K.stops, STOPS);
+    keep(K.stopids, STOP_ID);
+    keep("bus704.driver.coords", COORDS);
+  }catch(_){
+    STOPS   = recall(K.stops, {outward: [], return: []});
+    STOP_ID = recall(K.stopids, {});
+  }
+
+  let days = [];
+  try{
+    days = await rpc("bus_driver_upcoming", {p_from: null, p_count: 5}) || [];
+  }catch(_){ days = []; }
+
+  if(days.length){
+    DAYS = days.map(d => new Date(d.service_date + "T12:00:00"));
+    DAYRUNS = days.map(() => ({outward: {standDown: false, reason: ""},
+                               return:  {standDown: false, reason: ""}}));
+    TODAY_RUNS = !!days[0].is_today;
+    /* THE WHOLE LOT, NOT JUST TODAY. Looking ahead has to work with no
+       signal too, because that is exactly when he is asked. */
+    const sheets = await Promise.all(days.map(async (d, i) => {
+      try{
+        const rows = await rpc("bus_driver_sheet", {p_service_date: d.service_date});
+        (rows || []).forEach(r => {
+          if(r.journey_status === "cancelled"){
+            const leg = r.direction === "return" ? "return" : "outward";
+            DAYRUNS[i][leg] = {standDown: true, reason: ""};
+          }
+        });
+        return sheetFromRows(rows);
+      }catch(_){ return {outward: [], return: []}; }
+    }));
+    SHEETS = sheets;
+    keep(K.sheets, {at: new Date().toISOString(),
+                    days: days.map(d => d.service_date),
+                    dayrows: days, sheets: SHEETS, dayruns: DAYRUNS,
+                    todayRuns: TODAY_RUNS});
+  }else{
+    /* No signal, or nothing came back. Use what the phone is holding -
+       this is the ordinary condition on this road, not a failure. */
+    const held = recall(K.sheets, null);
+    if(held){
+      DAYS = held.days.map(s => new Date(s + "T12:00:00"));
+      SHEETS = held.sheets; DAYRUNS = held.dayruns;
+      TODAY_RUNS = held.todayRuns;
+      DAYROWS = held.dayrows || [];
+    }
+  }
+  if(days.length) DAYROWS = days;
+}
+let DAYROWS = [];
+
+/* The service date of the day on screen, as the database spells it. */
+function dateOfDay(i){
+  const d = DAYS[i];
+  if(!d) return null;
+  const p = n => String(n).padStart(2, "0");
+  return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate());
+}
+
+/* ------------------------------------------------------------------
+   The queue. A tap NEVER waits for a bar of signal.
+------------------------------------------------------------------ */
+let QUEUE = recall(K.queue, []);
+let flushing = false;
+
+/* ------------------------------------------------------------------
+   THE WALK-ON THAT HAS NOT BEEN GIVEN A NAME YET
+   ------------------------------------------------------------------
+   Somebody flags the bus down on the Bealach. Malcolm records them with
+   no signal, and half an hour later - still with no signal - says where
+   they got on and where they got off. The first call has not reached the
+   database, so the database's id for that person does not exist yet.
+
+   So the phone gives them ITS OWN id straight away, and the two later
+   answers are queued against that. When the queue finally runs, the walk
+   on is created first, the database's real id comes back, and the two
+   answers behind it are rewritten to use it before they are sent.
+
+   Without this the answers were simply never sent - which is what the
+   rebuilt screen was doing, silently, and is exactly the sort of thing
+   that only shows up when Kay's Council return comes out short.
+------------------------------------------------------------------ */
+let WALKON_IDS = recall(K.walkons, {});
+
+function enqueue(fn, args, tag){
   QUEUE.push({id: Date.now() + "-" + Math.random().toString(36).slice(2, 7),
-              fn, args, at: new Date().toISOString(), tries: 0});
+              fn: fn, args: args, at: new Date().toISOString(), tag: tag || null});
   keep(K.queue, QUEUE);
+  state.pending = QUEUE.length;
   flush();
 }
+
+/* An argument written "@walkon:<the phone's own id>" is standing in for a
+   database id that did not exist when the driver tapped. */
+function resolveArgs(args){
+  const out = {};
+  let missing = null;
+  Object.keys(args || {}).forEach(k => {
+    const v = args[k];
+    if(typeof v === "string" && v.indexOf("@walkon:") === 0){
+      const local = v.slice(8);
+      const real = WALKON_IDS[local];
+      if(real) out[k] = real; else { missing = local; out[k] = null; }
+    }else out[k] = v;
+  });
+  return {args: out, missing: missing};
+}
+
 async function flush(){
   if(flushing || !QUEUE.length || !SESSION) return;
-  if(navigator.onLine === false){ ONLINE = false; render(); return; }
   flushing = true;
-  while(QUEUE.length){
-    const item = QUEUE[0];
-    try{
-      await rpc(item.fn, item.args);
-      QUEUE.shift();
-      keep(K.queue, QUEUE);
-      ONLINE = true;
-    }catch(e){
-      const code = (e && e.code) || "";
-      /* A refusal from the database is final - retrying it forever would
-         block everything behind it. Anything else is the road, not the
-         request, so it waits. */
-      if(code && !/Failed to fetch|NetworkError|load failed/i.test(String(e.message))){
-        item.tries++;
-        if(item.tries >= 3){
-          QUEUE.shift();
-          keep(K.queue, QUEUE);
-          item.rejected = say(e);
-          REJECTED.push(item);
-        }else{
-          keep(K.queue, QUEUE);
+  try{
+    while(QUEUE.length){
+      const item = QUEUE[0];
+      const r = resolveArgs(item.args);
+      if(r.missing){
+        /* The walk-on it belongs to has not been created yet and is not
+           ahead of it in the queue either - which should not happen, but
+           throwing the answer away because of that would be the wrong way
+           round. It is left for the next flush. */
+        break;
+      }
+      try{
+        const said = await rpc(item.fn, r.args);
+        /* The database's own id for a walk-on, kept so that the answers
+           queued behind it can be rewritten to use it. */
+        if(item.tag && item.tag.walkOn && said && said.walk_on_id){
+          WALKON_IDS[item.tag.walkOn] = said.walk_on_id;
+          keep(K.walkons, WALKON_IDS);
         }
-      }else{
-        ONLINE = false;
+        QUEUE.shift();
+        keep(K.queue, QUEUE);
+        state.online = true;
+      }catch(e){
+        /* A refusal from the database is not a signal problem and must
+           not block everything behind it for ever. */
+        if(e.status && e.status >= 400 && e.status < 500 && !/JWT|token/i.test(String(e.code))){
+          QUEUE.shift(); keep(K.queue, QUEUE);
+          continue;
+        }
+        state.online = false;
         break;
       }
     }
+  }finally{
+    flushing = false;
+    state.pending = QUEUE.length;
+    if(typeof render === "function") render();
   }
-  flushing = false;
-  render();
 }
-const REJECTED = [];
-
-window.addEventListener("online",  () => { ONLINE = true;  flush(); render(); });
-window.addEventListener("offline", () => { ONLINE = false; render(); });
-setInterval(() => { if(QUEUE.length) flush(); }, 20000);
-
-/* ------------------------------------------------------------------
-   State
------------------------------------------------------------------- */
-let VIEW = "days";           // days | sheet | endofrun | runmap | otherdays | peek
-let DAYS = recall(K.days, null);
-let SHEET = recall(K.sheet, null);   // {date, direction, fetched_at, summary, rows}
-let LOCAL = {};              // booking_id -> "boarded" | "no_show" | null, before the send
-let ENDRUN = null;
-let MSG = null;
-
-const el = id => document.getElementById(id);
-const M = () => el("main");
-const esc = s => String(s == null ? "" : s)
-  .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-const hhmm = t => t ? String(t).slice(0, 5) : "";
-function niceDate(d){
-  try{ return new Date(d + "T12:00:00").toLocaleDateString("en-GB",
-    {weekday: "long", day: "numeric", month: "long"}); }catch(_){ return d; }
-}
-/* The database stores requirement types as words like "walking_aid",
-   which is right for a database and wrong for a screen somebody reads at
-   speed. The detail a customer typed is kept exactly as they typed it. */
-const REQ_WORDS = {
-  folding_wheelchair: "folding wheelchair",
-  walking_aid: "walking stick or frame",
-  pushchair: "pushchair",
-  large_luggage: "large luggage",
-  dog: "dog",
-  bicycle: "bicycle",
-  other: "something else"
+window.addEventListener("online", () => { state.online = true; flush(); });
+window.addEventListener("offline", () => { state.online = false; if(typeof render === "function") render(); });
+const state = {
+  leg:"outward",
+  dayIdx:0,           /* which of DAYS is on screen */
+  simple:true,        /* STARTS SIMPLE. Read-only until he asks otherwise. */
+  taps:{},            /* ref -> "boarded" | "no_show" */
+  walkOns:[],         /* {id, at, count, where, metres, needsDetail, leg} */
+  walkSeq:0,
+  late:{},            /* dayIdx -> {mins} — running late, told to everybody */
+  receipts:[],        /* {id, dayIdx, at, kind, amount} */
+  receiptSeq:0,
+  ask:null,           /* the sheet that has slid up, if any */
+  pending:0,          /* taps waiting for signal */
+  online:true,
+  showMap:false,
+  realMap:false,      /* the geographic map, under the strip map */
+  mapSel:null,        /* which stop is tapped on the map */
+  view:"list",        /* "list" or "finish" */
+  /* Bookings where the passenger got off somewhere OTHER than booked.
+     Absence means as booked, which is the answer nearly every time —
+     the operator's own suggestion, and it costs him no taps. */
+  dropped:{},         /* ref -> place name */
+  fetched:new Date()
 };
-function prettyReqs(s){
-  if(!s) return "";
-  return String(s).split(", ").map(part => {
-    const m = /^([a-z_]+)(\s*\((.*)\))?$/.exec(part.trim());
-    if(!m) return part;
-    const word = REQ_WORDS[m[1]] || m[1].replace(/_/g, " ");
-    return word + (m[3] ? " (" + m[3] + ")" : "");
-  }).join(", ");
-}
-function howOld(iso){
-  if(!iso) return "";
-  const mins = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
-  if(mins < 1) return "just now";
-  if(mins < 60) return mins + (mins === 1 ? " minute ago" : " minutes ago");
-  const h = Math.round(mins / 60);
-  return h + (h === 1 ? " hour ago" : " hours ago");
+
+function ymd(d){
+  const p=n=>String(n).padStart(2,"0");
+  return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`;
 }
 
-/* ------------------------------------------------------------------
-   Rendering
------------------------------------------------------------------- */
-function renderBanner(){
-  const b = el("banner");
-  const pending = QUEUE.length;
-  if(!ONLINE){
-    b.className = "banner off";
-    b.textContent = pending
-      ? "No signal. " + pending + (pending === 1 ? " tap" : " taps") +
-        " kept on this phone — they will send themselves. Carry on."
-      : "No signal. Everything you tap is kept on this phone. Carry on.";
-  }else if(pending){
-    b.className = "banner queued";
-    b.textContent = "Sending " + pending + (pending === 1 ? " tap" : " taps") + "…";
-  }else{
-    b.className = ""; b.textContent = "";
+const app=document.getElementById("app");
+function el(h){const t=document.createElement("template");t.innerHTML=h.trim();return t.content.firstElementChild;}
+function esc(s){return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
+
+function fmtDay(d){
+  return d.toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"long"});
+}
+function hhmm(d){ return d.toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"}); }
+
+/* Everything below reads the day that is on screen, not "the" day. That is
+   the whole change: there is only one screen, and the date at the top says
+   which day it is describing. */
+function sheetFor(i){ return SHEETS[i]; }
+function runsFor(i){ return DAYRUNS[i]; }
+function peopleOn(i, leg){ return SHEETS[i][leg].reduce((n,s)=>n+s.party,0); }
+function people(leg){ return peopleOn(state.dayIdx, leg); }
+function boardedCount(leg){
+  return SHEETS[state.dayIdx][leg]
+    .filter(s=>state.taps[s.ref]==="boarded").reduce((n,s)=>n+s.party,0);
+}
+
+/* =====================================================================
+   WHAT IS STILL TO FINISH
+   ---------------------------------------------------------------------
+   Kay needs to know where people got off. The operator was equally clear
+   about when it gets asked:
+
+     "Need to know when people get off. Does not need to be live. Driver
+      could complete at end of run."
+     "It ok doesn't need to be done when he's driving, he generally stops
+      to let them off."
+
+   So none of this appears while he is out on the road. It is a short list
+   at the end, with the handbrake on.
+
+   For BOOKED passengers the operator supplied the design himself — "it
+   stays what's been booked and Malcolm changes anything different" — so
+   the default is that everybody got off where they said, and he records
+   only the exceptions. A normal day needs no taps at all.
+   ===================================================================== */
+function walkOnsForDay(i){ return state.walkOns.filter(w=>w.dayIdx===i); }
+/* "these 1 get on" is the sort of thing that makes a screen feel like it
+   was written by a machine, and this one is read by a man at the end of a
+   nine-hour day. */
+function them(n){ return n===1 ? "this person" : "these " + n; }
+function outstanding(i){
+  const w = walkOnsForDay(i);
+  return { place: w.filter(x=>x.needsDetail).length,
+           off:   w.filter(x=>!x.off).length,
+           total: w.length };
+}
+
+function renderFinish(shown){
+  app.innerHTML="";
+  const i = state.dayIdx, o = outstanding(i);
+  const jobs = o.place + o.off;
+
+  app.appendChild(el(`<div class="fhead">
+    <b>Finishing ${esc(fmtDay(shown))}</b>
+    ${jobs
+      ? `${jobs} thing${jobs===1?"":"s"} to answer. Take your time — none of this
+         is urgent and nothing is lost if you leave it until tonight.`
+      : `Nothing outstanding.`}</div>`));
+
+  /* -------- walk-ons -------- */
+  if(!o.total){
+    app.appendChild(el(`<div class="empty">
+      Nobody got on without booking today, so there is nothing to say about
+      where they got off.</div>`));
   }
+  walkOnsForDay(i).forEach(w=>{
+    if(w.needsDetail){
+      const row=el(`<div class="frow">
+        <p class="q">Where did ${them(w.count)} get on?</p>
+        <p class="sub">${esc(w.at)} &middot; ${w.leg==="outward"?"on the way in":"coming home"}
+          ${w.where ? " &middot; the phone thought " + esc(w.where) : ""}</p>
+        <button>Say where they got on</button></div>`);
+      row.querySelector("button").onclick=()=>{ state.ask={kind:"place", id:w.id}; render(); };
+      app.appendChild(row);
+    }
+    const done = !!w.off;
+    const row=el(`<div class="frow ${done?"ok":""}">
+      <p class="q">${done ? "Got off at " + esc(w.off)
+        : `Where did ${them(w.count)} get off?`}</p>
+      <p class="sub">Got on ${w.where ? "at " + esc(w.where) : "somewhere still to say"}
+        at ${esc(w.at)}${done ? "" : " &middot; Kay needs this for the Council"}</p>
+      <button>${done ? "Change it" : "Say where they got off"}</button></div>`);
+    row.querySelector("button").onclick=()=>{ state.ask={kind:"dest", id:w.id}; render(); };
+    app.appendChild(row);
+  });
+
+  /* -------- booked passengers: only the exceptions -------- */
+  /* SOMEBODY WHO NEVER GOT ON CANNOT HAVE GOT OFF ANYWHERE. Offering
+     them here is a way of recording a no-show as an alighting, which is
+     the one thing the Council return must never contain. */
+  const carried = x => !x.b.noShow;
+  const booked = SHEETS[i].outward.map(b=>({b, leg:"outward"}))
+    .concat(SHEETS[i].return.map(b=>({b, leg:"return"})))
+    .filter(carried);
+  const changed = booked.filter(x=>state.dropped[x.b.ref]);
+  app.appendChild(el(`<div class="fhead" style="margin-top:1.1rem">
+    <b>Everybody else</b>
+    ${changed.length
+      ? `${changed.length} got off somewhere other than where they booked.`
+      : `Taken as getting off where they booked — which is nearly always right,
+         so there is nothing to tick.`}</div>`));
+
+  booked.forEach(({b, leg})=>{
+    const off = state.dropped[b.ref];
+    const row=el(`<div class="frow ${off ? "" : "asbooked"}">
+      <p class="q">${esc(b.who)}${b.party>1?` and ${b.party-1} more`:""}</p>
+      <p class="sub">${leg==="outward" ? "On the way in" : "Coming home"}
+        &middot; booked off at ${esc(b.dest)}${
+        off ? ` &middot; <strong>actually got off at ${esc(off)}</strong>` : ""}</p>
+      <button>${off ? "That was wrong — put it back" : "Got off somewhere else"}</button>
+      </div>`);
+    row.querySelector("button").onclick=()=>{
+      if(off){
+        delete state.dropped[b.ref]; render();
+        /* Putting it back to as-booked REMOVES the correction rather than
+           storing a row that says nothing - which is also how he undoes a
+           mis-tap without needing a delete button. */
+        const rs = findStop(b.ref);
+        if(rs && rs.bookingId && rs.destPointId) enqueue("bus_driver_different_alighting",
+          {p_booking_id: rs.bookingId, p_pickup_point_id: rs.destPointId,
+           p_description: null, p_note: null});
+      }
+      else { state.ask={kind:"dropped", ref:b.ref, leg:b.dest}; render(); }
+    };
+    app.appendChild(row);
+  });
+
+  /* WHAT THE DATABASE MAKES OF THE DAY.
+     Not what this phone thinks - what Kay will actually see. If the two
+     disagree, the driver is the one who can still do something about it,
+     and he can only do that if he is shown it. */
+  if(ENDRUN){
+    app.appendChild(el(`<div class="fhead" style="margin-top:1.1rem">
+      <b>What the office has for today</b>
+      ${ENDRUN.walk_ons || 0} got on without booking
+      (${ENDRUN.people || 0} ${Number(ENDRUN.people) === 1 ? "person" : "people"}) &middot;
+      ${ENDRUN.corrections || 0} got off somewhere other than booked.
+      ${ENDRUN.finished
+        ? "Nothing outstanding at the office either."
+        : `Still wanted: ${ENDRUN.need_place || 0} place${
+            Number(ENDRUN.need_place) === 1 ? "" : "s"} and ${
+            ENDRUN.need_destination || 0} destination${
+            Number(ENDRUN.need_destination) === 1 ? "" : "s"}.`}</div>`));
+  }
+
+  const back=el(`<button class="backlist">${
+    jobs ? "Back to the list &mdash; finish this later" : "Done"}</button>`);
+  back.onclick=()=>{ state.view="list"; render(); };
+  app.appendChild(back);
+
+  renderSheet();
 }
 
 function render(){
-  renderBanner();
-  if(!SESSION) return renderSignIn();
-  if(ME && !ME.active) return renderNoAccess();
-  el("signout").classList.remove("hidden");
-  el("back").classList.toggle("hidden", VIEW === "days");
-  if(VIEW === "sheet") return renderSheet();
-  if(VIEW === "endofrun") return renderEndOfRun();
-  if(VIEW === "runmap") return renderRunMap();
-  if(VIEW === "otherdays") return renderOtherDays();
-  if(VIEW === "peek") return renderPeek();
-  return renderDays();
-}
+  /* Anything that slid up gets cleared first. It lives outside #app, so
+     without this a sheet can outlive the screen that opened it — which is
+     exactly how "go back does not work" happened last time. */
+  document.querySelectorAll(".sheet").forEach(s => s.remove());
 
-function renderSignIn(){
-  el("signout").classList.add("hidden");
-  el("back").classList.add("hidden");
-  el("title").textContent = "Service 704 — the driver";
-  M().innerHTML = '<div class="card"><h2>Sign in</h2>' +
-    '<p class="muted">Your usual Ross Group staff login. Sign in once, where there is ' +
-    'signal — the phone stays signed in afterwards, so you can carry on out of range.</p>' +
-    '<div id="err"></div>' +
-    '<label for="em">Email address</label><input id="em" type="email" autocomplete="username" inputmode="email">' +
-    '<label for="pw">Password</label><input id="pw" type="password" autocomplete="current-password">' +
-    '<p></p><button class="btn" id="go">Sign in</button></div>';
-  const go = async () => {
-    el("go").disabled = true; el("go").textContent = "Signing in…";
-    try{
-      setSession(await authPost("password", {email: el("em").value.trim(), password: el("pw").value}));
-      await afterSignIn();
-    }catch(e){
-      el("err").innerHTML = '<div class="bad">' + esc(/Invalid login/i.test(e.message)
-        ? "That email address and password do not match an account." : e.message) + '</div>';
-      el("go").disabled = false; el("go").textContent = "Sign in";
-    }
-  };
-  el("go").onclick = go;
-  el("pw").onkeydown = e => { if(e.key === "Enter") go(); };
-}
+  const shown = DAYS[state.dayIdx];
+  const isToday = isTodayIdx(state.dayIdx);
+  document.getElementById("day").textContent =
+    (isToday ? "Today · " : "") + fmtDay(shown);
+  document.getElementById("meta").textContent =
+    `${people("outward")} out · ${people("return")} back · ` +
+    (isToday ? `sheet loaded ${hhmm(state.fetched)}` : "booked so far");
 
-function renderNoAccess(){
-  const knocked = ME && ME.has_login_but_no_bus_access;
-  M().innerHTML = '<div class="card"><h2>' +
-    (knocked ? 'Your login does not open the bus yet' : 'Your account is not active') +
-    '</h2>' +
-    (knocked
-      ? '<p>Signed in as <strong>' + esc(ME.name || ME.email || "") + '</strong>, but the bus ' +
-        'has not been switched on for you.</p>' +
-        '<p class="muted">Ask Duncan — it is one line on the staff screen he already uses. ' +
-        'Same login, no new password.</p>'
-      : '<p class="muted">Ask Duncan to switch this login back on in the staff portal.</p>') +
-    '<p></p><button class="btn secondary" id="again">Try again</button></div>';
-  el("again").onclick = () => afterSignIn();
-}
+  /* THE CONNECTION LINE.
+     Offline is the normal condition on this route, so it is stated calmly
+     and never as an error. What matters is that anything he taps is safe
+     and will go when there is coverage. */
+  const conn=document.getElementById("conn");
+  conn.className = "conn" + (state.online ? "" : " off");
+  conn.textContent = state.online
+    ? (state.pending ? `Sending ${state.pending} update${state.pending===1?"":"s"}…`
+                     : "Signal — everything sent")
+    : `No signal — ${state.pending} update${state.pending===1?"":"s"} held on this phone, safe`;
 
-function renderDays(){
-  el("title").textContent = "Which day";
-  let html = "";
-  if(MSG) html += '<div class="card"><div class="good">' + esc(MSG) + '</div></div>';
-  if(!DAYS){
-    html += '<div class="card">Loading the days…</div>';
-  }else if(!DAYS.length){
-    html += '<div class="card"><p>No operating days found. Pull down when you have signal.</p></div>';
-  }else{
-    DAYS.forEach(d => {
-      html += '<button class="daybtn' + (d.is_today ? " today" : "") +
-        (d.stood_down ? " down" : "") + '" data-d="' + esc(d.service_date) + '">' +
-        '<span><strong>' + (d.is_today ? "Today" : esc(d.day_name)) + '</strong><br>' +
-        '<span class="muted">' + esc(niceDate(d.service_date)) +
-        (d.stood_down ? " · STOOD DOWN" : "") +
-        (Number(d.needs_tidying) > 0 ? " · " + d.needs_tidying + " to tidy up" : "") +
-        '</span></span>' +
-        '<span class="n">' + d.people + '</span></button>';
-    });
-  }
-  html += '<button class="btn ghost" id="refresh">Fetch the days again</button>';
-  M().innerHTML = html;
-  M().querySelectorAll(".daybtn").forEach(b => {
-    b.onclick = () => openDay(b.dataset.d, null);
+  const mb=document.getElementById("modetext"), bt=document.getElementById("modebtn");
+  mb.textContent = state.simple ? "Just the list — nothing to tap"
+                                : "Ticking off as you go";
+  bt.textContent = state.simple ? "Let me tick people off" : "Just the list";
+  bt.onclick=()=>{ state.simple=!state.simple; render(); };
+
+  app.className = (state.simple ? "simple" : "") + (lookOnly() ? " lookonly" : "");
+  app.innerHTML="";
+
+  /* WHICH DAY. Today first, then the next operating days. The operator
+     wants to look at Saturday and Monday from a Thursday, and the answer
+     to "when does he want that?" is often "standing in the shop with no
+     signal", so the days ahead come down with the rest of the sheet. */
+  const strip=el(`<div class="days"></div>`);
+  DAYS.forEach((d,i)=>{
+    const n = peopleOn(i,"outward") + peopleOn(i,"return");
+    const so = seatsOn(i,"outward"), sh = seatsOn(i,"return");
+    const worst = so === null ? sh : (sh === null ? so : Math.min(so,sh));
+    const b=el(`<button class="${state.dayIdx===i?"on":""}"
+      data-peek="${ymd(d)}">
+      <span class="dn">${isTodayIdx(i) ? "Today"
+        : d.toLocaleDateString("en-GB",{weekday:"short"})}</span>
+      <span class="dd">${d.getDate()} ${d.toLocaleDateString("en-GB",{month:"short"})}</span>
+      <span class="dc">${n} booked</span>
+      ${worst === null ? "" : `<span class="ds ${
+        worst <= 0 ? "full" : (worst <= 2 ? "low" : "")}">${seatWords(worst)}</span>`}
+      </button>`);
+    /* Tapping a day changes the date and nothing else. Same screen, same
+       buttons, same order — he is not learning a second thing. */
+    b.onclick=()=>{ state.dayIdx=i; state.showMap=false; state.realMap=false;
+                    state.mapSel=null; render(); };
+    strip.appendChild(b);
   });
-  el("refresh").onclick = loadDays;
-}
+  app.appendChild(strip);
 
-/* One handset, drawn once. An emoji would be at the mercy of whatever the
-   phone decides to render, and this has to be unmistakable at arm's length
-   in the rain. */
-const PHONE_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.6 10.8a15.1 15.1 0 0 0 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.2.4 2.4.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1A17 17 0 0 1 3 4c0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.4 0 .8-.2 1l-2.3 2.2z"/></svg>';
-
-function renderSheet(){
-  const s = SHEET;
-  el("title").textContent = s ? (s.date === todayISO() ? "Today" : niceDate(s.date)) : "The run";
-  if(!s){ M().innerHTML = '<div class="card">Loading…</div>'; return; }
-
-  const j = (s.summary && s.summary.journeys || []).find(x => x.direction === s.direction);
-  const rows = s.rows.filter(r => r.direction === s.direction);
-
-  let html = '<div class="card">' +
-    '<div class="pick">' +
-      '<button data-dir="outward" aria-pressed="' + (s.direction === "outward") + '">To Inverness</button>' +
-      '<button data-dir="return" aria-pressed="' + (s.direction === "return") + '">Home</button>' +
-    '</div>';
-
-  if(j && j.stood_down){
-    html += '<div class="bad"><strong>This run is stood down.</strong>' +
-      (j.reason ? ' ' + esc(j.reason) : '') +
-      (Number(j.not_told) > 0
-        ? '<br>' + j.not_told + (Number(j.not_told) === 1 ? " passenger has" : " passengers have") +
-          ' not been told yet.' : '') + '</div>';
-  }
-  html += '<div class="muted">' +
-    (j ? (j.people + (Number(j.people) === 1 ? " person" : " people") + " booked, " +
-          j.bookings + (Number(j.bookings) === 1 ? " booking" : " bookings")) : "Nothing booked") +
-    (j && j.trailer_needed ? ' · <strong>trailer needed</strong>' : '') +
-    (j && Number(j.overrides) > 0 ? ' · ' + j.overrides + ' on seat 13/14' : '') +
-    '<br>List fetched ' + esc(howOld(s.fetched_at)) + '.</div>' +
-    '</div>';
-
-  if(!rows.length){
-    html += '<div class="card"><p>Nobody booked on this run.</p>' +
-      '<p class="muted">Anyone who flags the bus down is a walk-on — the button is at the ' +
-      'bottom.</p></div>';
-  }
-
-  rows.forEach(r => {
-    const state = LOCAL[r.booking_id] !== undefined ? LOCAL[r.booking_id]
-                 : (r.boarded ? "boarded" : (r.no_show ? "no_show" : null));
-    html += '<div class="pax' + (state === "boarded" ? " on" : (state === "no_show" ? " off" : "")) +
-      '" data-id="' + esc(r.booking_id) + '">' +
-      '<div><span class="time">' + esc(hhmm(r.estimated_time || r.scheduled_time)) + '</span>' +
-      '<span class="stop">' + esc(r.pickup) + '</span></div>' +
-      (r.pickup_detail ? '<div class="sub">' + esc(r.pickup_detail) + '</div>' : '') +
-      '<div class="name">' + esc(r.lead_name) + ' · ' + r.party_size +
-        (Number(r.party_size) === 1 ? "" : " people") + '</div>' +
-      (r.other_names ? '<div class="sub">with ' + esc(r.other_names) + '</div>' : '') +
-      '<div class="sub">off at ' + esc(r.drop_off) + '</div>' +
-      (r.telephone ? '<div class="sub">' + esc(r.telephone) + '</div>' : '') +
-      /* A pin pickup is a spot on a road with no name. One tap opens it in
-         whatever maps app the phone has, which is the difference between
-         finding it and driving past it twice. */
-      (r.pickup_latitude && r.pickup_longitude
-        ? ' <a class="tel" href="https://www.google.com/maps/search/?api=1&query=' +
-          encodeURIComponent(r.pickup_latitude + "," + r.pickup_longitude) +
-          '" target="_blank" rel="noopener">Show me on the map</a>' : '') +
-      '<div class="flags">' +
-        (r.requirements ? '<span class="flag warn">' + esc(prettyReqs(r.requirements)) + '</span>' : '') +
-        (r.needs_trailer ? '<span class="flag warn">trailer</span>' : '') +
-        (r.is_override ? '<span class="flag warn">seat 13/14</span>' : '') +
-        (r.can_be_texted === false ? '<span class="flag bad">no text — ring only</span>' : '') +
-        (r.not_told ? '<span class="flag bad">NOT TOLD the run is off</span>' : '') +
-      '</div>' +
-      (r.driver_note ? '<div class="note">' + esc(r.driver_note) + '</div>' : '') +
-      '<div class="acts">' +
-        '<button class="yes" data-act="boarded" aria-pressed="' + (state === "boarded") + '">On</button>' +
-        '<button class="no" data-act="no_show" aria-pressed="' + (state === "no_show") + '">Not here</button>' +
-        /* Beside "Not here" on purpose: nobody at the road end is the moment
-           he wants to ring, and it must be one tap away from that thought.
-           tel: works with no data signal - a call is not the internet - so
-           this is the one thing on the screen that always works. */
-        (r.telephone
-          ? '<a class="ring" href="tel:' + esc(String(r.telephone).replace(/[^\d+]/g, "")) +
-            '" aria-label="Ring ' + esc(r.lead_name) + ' on ' + esc(r.telephone) + '">' +
-            PHONE_ICON + 'Ring</a>'
-          : '<span class="noring">No number for them</span>') +
-      '</div></div>';
-  });
-
-  /* RUNNING LATE, from the road. Agreed in July for the driver, the tills
-     and the office, because a delay is discovered by whoever discovers it -
-     and most often that is him, stopped, with something to tell fourteen
-     people. Same shape as the walk-on button for the same reason. */
-  const jid = (SHEET.summary && SHEET.summary.journeys || [])
-                .filter(x => x.direction === SHEET.direction)
-                .map(x => x.journey_id)[0]
-              || (rows[0] && rows[0].journey_id);
-  if(jid){
-    html += (LATE[jid]
-      ? '<div class="note"><strong>Showing as about ' + Number(LATE[jid]) +
-        ' minutes late.</strong> The office and the tills see this too.</div>' +
-        '<button class="btn secondary" data-late="' + esc(jid) + '">Change how late we are</button>' +
-        '<p></p><button class="btn ghost" data-ontime="' + esc(jid) + '">We are back on time</button>' +
-        '<p></p>'
-      : '<button class="btn secondary" data-late="' + esc(jid) + '">We are running late</button><p></p>');
-  }
-
-  html += '<button class="btn secondary" id="otherdays">Another day — have we space?</button>' +
-    '<p></p><button class="btn secondary" id="runmap">Show me the run on a map</button>' +
-    '<p></p><button class="btn secondary" id="walkon">Somebody flagged us down</button>' +
-    '<p></p><button class="btn ghost" id="refresh">Fetch the list again</button>' +
-    '<p></p><button class="btn ghost" id="endrun">End of the run</button>';
-
-  if(REJECTED.length){
-    html += '<div class="card"><div class="bad"><strong>' + REJECTED.length +
-      ' tap' + (REJECTED.length === 1 ? "" : "s") + ' could not be saved.</strong><br>' +
-      esc(REJECTED.map(x => x.rejected).join(" ")) + '<br>Ring the office.</div></div>';
-  }
-
-  M().innerHTML = html;
-
-  M().querySelectorAll(".pick button").forEach(b => {
-    b.onclick = () => { SHEET.direction = b.dataset.dir; keep(K.sheet, SHEET); render(); };
-  });
-  M().querySelectorAll(".pax .acts button").forEach(b => {
-    b.onclick = () => tap(b.closest(".pax").dataset.id, b.dataset.act);
-  });
-  el("walkon").onclick = walkOn;
-  if(el("runmap")) el("runmap").onclick = () => { VIEW = "runmap"; render(); };
-  if(el("otherdays")) el("otherdays").onclick = () => { VIEW = "otherdays"; loadDays(); render(); };
-  M().querySelectorAll("button[data-late]").forEach(b => {
-    b.onclick = () => sayWeAreLate(b.dataset.late);
-  });
-  M().querySelectorAll("button[data-ontime]").forEach(b => {
-    b.onclick = () => sayWeAreOnTime(b.dataset.ontime);
-  });
-  el("refresh").onclick = () => openDay(SHEET.date, SHEET.direction);
-  el("endrun").onclick = () => { VIEW = "endofrun"; ENDRUN = null; loadEndOfRun(); };
-}
-
-function renderEndOfRun(){
-  el("title").textContent = "End of the run";
-  let html = '<div class="card"><h2>' +
-    (SHEET ? esc(niceDate(SHEET.date)) : "") + '</h2>';
-  if(!ENDRUN){
-    html += '<p>Loading… (this one needs signal.)</p></div>';
-    M().innerHTML = html;
+  /* FINISHING THE DAY lives on the same screen behind one button, rather
+     than in a separate place he has to remember exists. */
+  if(state.view === "finish"){
+    const keep = strip;
+    renderFinish(shown);
+    app.insertBefore(keep, app.firstChild);
     return;
   }
-  const s = ENDRUN.summary || {};
-  if(s.finished){
-    html += '<div class="good"><strong>Nothing left to do.</strong> ' +
-      (Number(s.walk_ons) > 0
-        ? s.walk_ons + (Number(s.walk_ons) === 1 ? " walk-on" : " walk-ons") +
-          ", " + s.people + " between them, all accounted for."
-        : "No walk-ons today.") + '</div>';
-  }else{
-    html += '<div class="note">Two questions the office cannot answer for you: where each ' +
-      'flagged-down passenger got on, and where they got off. Everything else can wait.</div>';
-  }
-  html += '</div>';
 
-  (ENDRUN.outstanding || []).forEach(o => {
-    html += '<div class="card" data-w="' + esc(o.walk_on_id) + '">' +
-      '<div class="name">' + o.boarded_count +
-        (Number(o.boarded_count) === 1 ? " person" : " people") + ' · ' +
-        (o.direction === "outward" ? "to Inverness" : "coming home") + '</div>' +
-      '<div class="sub">' + esc(o.got_on_at || "place not recorded") +
-        (o.note ? ' · ' + esc(o.note) : '') + '</div>' +
-      '<label>' + (o.kind === "walk_on_place" ? "Where did they get ON?" : "Where did they get OFF?") +
-      '</label>' +
-      '<select data-kind="' + esc(o.kind) + '"><option value="">— choose —</option>' +
-      (STOPS[o.direction] || []).map(st =>
-        '<option value="' + esc(st.id) + '">' + esc(st.n) + '</option>').join("") +
-      '</select></div>';
+  /* ONE LINE on any day that is not today, and then out of the way. It has
+     to be said — bookings come in until 6pm the night before, so what he is
+     looking at can still change — but saying it must not cost him the list.
+     That was the wrong call yesterday and this is the fix. */
+  if(!isToday){
+    const night = new Date(shown); night.setDate(night.getDate()-1);
+    app.appendChild(el(`<div class="banner trailer">
+      ${!TODAY_RUNS && isTodayIdx(state.dayIdx)
+        ? "<strong>Nothing runs today.</strong> " : ""}<strong>Looking only.</strong> This is
+      ${shown.toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"long"})}
+      as it stands now, so you can tell somebody whether there is a seat.
+      Nothing here books them &mdash; they ring the office on
+      <a href="tel:01520722997">01520 722997</a>. More can still be booked until 6pm on
+      ${night.toLocaleDateString("en-GB",{weekday:"long"})},
+      so have a look again on the morning.</div>`));
+  }
+
+  /* Which leg. Both are on the sheet — he cannot fetch the second half
+     from the far side of the Bealach. */
+  const runs = runsFor(state.dayIdx);
+  const legs=el(`<div class="legs" role="tablist"></div>`);
+  [["outward","To Inverness"],["return","Coming home"]].forEach(([k,label])=>{
+    const s = seatsOn(state.dayIdx, k);
+    const b=el(`<button role="tab" aria-selected="${state.leg===k}">
+      ${label}<span class="n">${people(k)} booked${
+        runs[k].standDown ? " · NOT RUNNING"
+          : (s === null ? "" : " · " + seatWords(s))}</span></button>`);
+    b.onclick=()=>{ state.leg=k; state.realMap=false; state.mapSel=null; render(); };
+    legs.appendChild(b);
   });
+  app.appendChild(legs);
+
+  const leg=state.leg, run=runs[leg], list=SHEETS[state.dayIdx][leg];
+
+  if(run.standDown){
+    app.appendChild(el(`<div class="banner down">
+      <span class="h">THIS RUN IS NOT RUNNING</span>
+      ${esc(run.reason||"Stood down by the office.")}<br>
+      Anybody below marked <strong>NOT TOLD</strong> may be waiting at their road end
+      regardless. Please look.</div>`));
+  }
+
+  if(state.late[state.dayIdx]){
+    app.appendChild(el(`<div class="banner trailer">
+      You have told everybody ${isToday ? "the bus is" : "this bus will be"} about
+      ${state.late[state.dayIdx].mins} minutes late.
+      Tap the amber button below to change it or to say it is on time again.</div>`));
+  }
+
+  if(list.some(s=>s.trailer)){
+    /* One line, at the top, before he sets off — not discovered at
+       Kishorn with a load and no trailer. On a day ahead it names the
+       day, because "today" on Saturday's screen while standing in the shop
+       on a Thursday is exactly the kind of small lie that gets a trailer
+       left behind. */
+    const items=[...new Set(list.filter(s=>s.trailer).map(s=>s.reqs).filter(Boolean))];
+    app.appendChild(el(`<div class="banner trailer">
+      Trailer needed ${isToday ? "today"
+        : "on " + shown.toLocaleDateString("en-GB",{weekday:"long"})}
+      &mdash; ${esc(items.join("; "))}</div>`));
+  }
+
+  if(!state.simple){
+    const on=boardedCount(leg), all=people(leg);
+    app.appendChild(el(`<div class="tally">
+      <b>${on} of ${all}</b> on board so far${
+        all-on ? ` · ${all-on} still to pick up` : " · everybody"}</div>`));
+  } else {
+    app.appendChild(el(`<div class="tally">
+      <b>${people(leg)}</b> booked${
+        list.length!==people(leg) ? ` across ${list.length} bookings` : ""}
+      · ${list.length ? "in the order you meet them" : ""}</div>`));
+  }
+
+  /* -------------------------------------------------------------------
+     SOMEBODY GOT ON
+     -------------------------------------------------------------------
+     Kay needs these for the Council return, and until now they have not
+     been recorded at all. The whole design is one constraint: he is a bus
+     driver. He cannot use the phone and drive, so he is stopped, at a
+     road end, with somebody standing on the step waiting to pay the
+     machine. Two taps and it is done, and nothing about it can fail in a
+     way that loses the record.
+     ------------------------------------------------------------------- */
+  const wb=el(`<button class="walkon">Somebody got on &mdash; not booked</button>`);
+  wb.onclick=()=>{ state.ask={kind:"count"}; render(); };
+  app.appendChild(wb);
+
+  /* RUNNING LATE.
+     The operator asked for this in three places at once — driver, till and
+     office — because it is discovered by whoever discovers it. Here it is
+     one tap to open and one tap for how late, the same shape as the
+     walk-on button, because it is pressed in the same circumstances:
+     stopped, at a road end, with something to tell fourteen people. */
+  /* THE DELAY, ON ANY DAY IN THE STRIP.
+     The operator: "This needs to be there even if its not that day yet as
+     what sometimes happens is the road can be closed and we know before".
+     A planned closure on the A890 is known days ahead, and telling people
+     the night before is worth far more than telling them at the road end.
+     So the wording changes but the button does not move. */
+  const lateNow = state.late[state.dayIdx] || null;
+  const dayWord = isToday ? "today" : shown.toLocaleDateString("en-GB",{weekday:"long"});
+  const lb=el(`<button class="latebtn ${lateNow?"on":""}">${
+    lateNow
+      ? `${isToday ? "Running" : dayWord + "'s bus will be"} ${lateNow.mins} minutes late — change it`
+      : (isToday ? "Running late — tell everybody"
+                 : `Tell everybody ${dayWord}'s bus will be late`)}</button>`);
+  lb.onclick=()=>{ state.ask={kind:"late", ahead:!isToday, day:dayWord}; render(); };
+  app.appendChild(lb);
+
+  /* -------------------------------------------------------------------
+     THE RECEIPT
+     -------------------------------------------------------------------
+     The operator: "can we have a take picture so the driver can take a
+     picture of the fuel and add blue receipt it could be twice in one day
+     then kay will have it automaticaly on back office."
+
+     This removes an entire handover. Today the receipt is stapled to a
+     sheet, carried to the office, and typed in days later — and if it goes
+     through the wash, the cost simply never reaches a Council claim.
+
+     Only on the day he is actually driving, because that is when he is at
+     a pump.
+     ------------------------------------------------------------------- */
+  if(isToday || state.dayIdx===0){
+    const mine = state.receipts.filter(r=>r.dayIdx===state.dayIdx);
+    const rb=el(`<button class="receiptbtn">
+      &#128247; Photograph a fuel or AdBlue receipt
+      <span class="sub">${mine.length
+        ? `${mine.length} taken today &mdash; you can take another`
+        : "Goes straight to the office. Nothing to carry."}</span></button>`);
+    rb.onclick=()=>{ state.ask={kind:"receipt"}; render(); };
+    app.appendChild(rb);
+
+    mine.forEach(r=>{
+      app.appendChild(el(`<div class="shot">
+        <div style="display:flex;gap:.7rem;align-items:center">
+          <span class="thumb">&#129534;</span>
+          <div><strong>${esc(r.kind)}</strong>
+            <div class="m">${esc(r.at)}${r.amount?" &middot; "+esc(r.amount):""}
+              &middot; sent to the office</div></div>
+        </div></div>`));
+    });
+  }
+
+  const mine = state.walkOns.filter(w=>w.leg===leg && w.dayIdx===state.dayIdx);
+  if(mine.length){
+    const todo = mine.filter(w=>w.needsDetail).length;
+    app.appendChild(el(`<div class="tally"><b>${
+      mine.reduce((n,w)=>n+w.count,0)}</b> got on without booking${
+      todo ? ` · <span style="color:var(--amber-ink)">${todo} still to say where</span>` : ""}
+      <br><span style="color:var(--ink-soft);font-size:.88rem">
+      Where they got off is asked at the end of the run, not now. Nothing here is
+      urgent and the office will not chase you for it.</span></div>`));
+
+    mine.forEach(w=>{
+      const row=el(`<div class="won ${w.needsDetail?"todo":""}">
+        <div>
+          <span class="wtime">${esc(w.at)}</span>
+          <div class="wwhere">${w.where ? esc(w.where)
+            : "Where did they get on?"}</div>
+          ${w.metres!=null && w.where
+            ? `<span class="wtime">phone put you ${w.metres} m from it</span>` : ""}
+          ${w.needsDetail && w.where
+            ? `<span class="wtime">that is a guess &mdash; please check</span>` : ""}
+          ${w.off ? `<span class="wtime">off at ${esc(w.off)}</span>` : ""}
+        </div>
+        <div style="display:flex;gap:.5rem;align-items:center">
+          <span class="wcount">${w.count}</span>
+          <button>${w.where ? "Change" : "Say where"}</button>
+        </div>
+      </div>`);
+      row.querySelector("button").onclick=()=>{
+        state.ask={kind:"place", id:w.id}; render();
+      };
+      app.appendChild(row);
+    });
+  }
+
+  /* -------------------------------------------------------------------
+     THE MAP
+     -------------------------------------------------------------------
+     Drawn on the phone out of the stop list. No tiles, no images, nothing
+     fetched — so it is there over the Bealach with one bar and it is
+     there with none. It is a strip map of the road in the order he drives
+     it, not a photograph of the ground, and it says so.
+     ------------------------------------------------------------------- */
+  const mbtn=el(`<button class="mapbtn ${state.showMap?"on":""}">${
+    state.showMap ? "Hide the route" : "Show the route on a map"}</button>`);
+  mbtn.onclick=()=>{ state.showMap=!state.showMap; state.mapSel=null;
+                     if(!state.showMap) state.realMap=false; render(); };
+  app.appendChild(mbtn);
+  if(state.showMap) app.appendChild(routeMap(leg, list));
+
+  if(!list.length){
+    app.appendChild(el(`<div class="empty">Nobody booked on this journey.<br><br>
+      If somebody flags you down, the green button above still records them.</div>`));
+    return renderSheet();
+  }
+
+  list.forEach(s=>{
+    const tap=state.taps[s.ref];
+    /* The booking's own id on the card. Nothing on screen reads it - it is
+       there so that a person looking at this page, or a test standing in
+       for one, can point at ONE passenger rather than "the first one",
+       which is how a check ends up proving nothing. */
+    const c=el(`<div class="stop ${tap==="boarded"?"boarded":""} ${tap==="no_show"?"noshow":""}
+        ${s.notTold?"nottold":""}" data-id="${esc(s.bookingId||"")}"
+        data-ref="${esc(s.ref||"")}">
+      <div class="head">
+        <div>
+          <div class="time">${esc(s.time)}</div>
+          <p class="place">${esc(s.place)}</p>
+          ${s.detail?`<p class="detail">${esc(s.detail)}</p>`:""}
+        </div>
+        <div class="count">${s.party}</div>
+      </div>
+      <p class="who">${esc(s.who)}</p>
+      ${s.with?`<p class="with">with ${esc(s.with)}</p>`:""}
+      <p class="with">Off at ${esc(s.dest)}</p>
+      <!-- THE NUMBER IS ON THE SHEET, not behind a tap that needs data.
+           If somebody is not at their road end this is what he needs, and
+           he may be somewhere he cannot look it up. -->
+      ${s.tel
+        ? `<a class="tel" href="tel:${esc(String(s.tel).replace(/[^\d+]/g,""))}"
+             aria-label="Ring ${esc(s.who)} on ${esc(s.tel)}">${esc(s.tel)}</a>`
+        : `<span class="noring">No number on the booking &mdash; ring the office
+             on 01520 722997</span>`}
+      <div class="flags"></div>
+      <div class="tapwrap"></div>
+    </div>`);
+
+    const f=c.querySelector(".flags");
+    if(s.notTold){
+      f.appendChild(el(`<span class="flag nottold">NOT TOLD the bus is cancelled —
+        they may be waiting here</span>`));
+    }
+    if(s.reqs){
+      f.appendChild(el(`<span class="flag req">${esc(s.reqs)}${
+        s.trailer ? " · trailer" : ""}</span>`));
+    }
+    if(s.ovr){
+      f.appendChild(el(`<span class="flag ovr">Extra seat used — ${esc(s.ovr)}</span>`));
+    }
+    if(s.note){
+      f.appendChild(el(`<span class="flag note">${esc(s.note)}</span>`));
+    }
+
+    /* THE TAPS. Offered, never demanded. Hidden entirely in simple mode. */
+    const tw=c.querySelector(".tapwrap");
+    const taps=el(`<div class="taps"></div>`);
+    const bOn=el(`<button class="${tap==="boarded"?"on":""}">
+      ${tap==="boarded"?"✓ On board":"On board"}</button>`);
+    bOn.onclick=()=>setTap(s.ref,"boarded");
+    const bNo=el(`<button class="${tap==="no_show"?"onno":""}">
+      ${tap==="no_show"?"✓ Not there":"Not there"}</button>`);
+    bNo.onclick=()=>setTap(s.ref,"no_show");
+    taps.appendChild(bOn); taps.appendChild(bNo);
+    tw.appendChild(taps);
+
+    if(tap){
+      /* UNDO. The wrong button gets tapped in the dark with gloves on, and
+         without an undo the driver's answer is to stop tapping anything. */
+      const u=el(`<p class="undo"><button>Undo — nothing recorded</button></p>`);
+      u.querySelector("button").onclick=()=>{
+        /* The undo has to reach the database too, or the sheet and the
+           record disagree the moment he reloads the run. */
+        clearTap(s.ref);
+      };
+      tw.appendChild(u);
+    }
+
+    app.appendChild(c);
+  });
+
+  /* -------------------------------------------------------------------
+     FINISH THE DAY
+     -------------------------------------------------------------------
+     At the BOTTOM, under everybody, because that is where he is when the
+     run is over. Never at the top competing with the next pickup.
+     ------------------------------------------------------------------- */
+  /* ONLY ON THE DAY HE DRIVES IT. There is nothing to finish about a
+     Monday that has not happened, and offering the button on one would
+     invite him to answer questions about a bus that has not left. */
+  if(lookOnly()){ return renderSheet(); }
+
+  const o = outstanding(state.dayIdx);
+  const jobs = o.place + o.off;
+  const fb = el(`<button class="finishbtn ${jobs ? "" : "done"}">
+    ${jobs ? "Finish the day" : "Nothing left to finish"}
+    <span class="sub">${jobs
+      ? `${jobs} thing${jobs===1?"":"s"} to answer &mdash; where people got off. Not urgent.`
+      : o.total
+        ? "Every walk-on has a place and a destination."
+        : "Nobody got on unbooked. Tap to check anything else."}</span></button>`);
+  fb.onclick=()=>{
+    state.view="finish"; render();
+    /* THE OFFICE'S FIGURES, FETCHED WHEN HE LOOKS AT THEM.
+       Read once at sign-in they are hours old by the end of the run, and
+       a summary that says "nothing outstanding" directly underneath a
+       list of things to answer is worse than no summary at all. */
+    refreshEndRun();
+  };
+  app.appendChild(fb);
+
+  renderSheet();
+}
+
+/* =====================================================================
+   THE MAP
+   ---------------------------------------------------------------------
+   Vertical, because a phone is tall and the place names are long. The
+   road runs down the page in the order he drives it, each stop is a band
+   he can hit with a thumb, and the pickups sit on it. Tapping a stop
+   tells him who is there, and — the reason it earns its place — lets him
+   say a walk-on got on there without typing anything.
+   ===================================================================== */
+function routeMap(leg, list){
+  const stops = STOPS[leg];
+  const LAST = stops.length - 1;
+  const W = 340, PAD = 26, GAP = 44;
+  const H = PAD*2 + LAST*GAP;
+  const y = i => PAD + i*GAP;
+  const x = i => 40 + Math.sin((i/LAST)*Math.PI*2.4)*13;   /* a road, not a ruler */
+
+  let d = `M ${x(0).toFixed(1)} ${y(0)}`;
+  for(let t=0.1; t<=LAST; t+=0.1) d += ` L ${x(t).toFixed(1)} ${y(t).toFixed(1)}`;
+
+  /* Who is waiting where. Anything that is not a named stop — a passing
+     place, a gate — cannot be a dot on this line, so it is listed under
+     the map instead of being quietly dropped. */
+  const at = {}, offline = [];
+  list.forEach(s=>{
+    const i = stops.indexOf(s.place);
+    if(i < 0){ offline.push(s); return; }
+    (at[i] = at[i] || []).push(s);
+  });
+  const walkAt = {};
+  state.walkOns.filter(w=>w.leg===leg && w.dayIdx===state.dayIdx && w.where).forEach(w=>{
+    const i = stops.indexOf(w.where);
+    if(i >= 0) walkAt[i] = (walkAt[i]||0) + w.count;
+  });
+
+  let marks = "";
+  stops.forEach((n,i)=>{
+    const here = at[i], wk = walkAt[i], sel = state.mapSel === i;
+    const cx = x(i).toFixed(1), cy = y(i);
+    marks += `<circle cx="${cx}" cy="${cy}" r="${here?11:6}"
+       fill="${here ? "#1f5f8b" : "#fff"}" stroke="${sel ? "#11191f" : "#1f5f8b"}"
+       stroke-width="${sel ? 5 : 3}"/>`;
+    if(here){
+      marks += `<text x="${cx}" y="${cy+5}" font-size="13" font-weight="800"
+        fill="#fff" text-anchor="middle">${here.reduce((a,s)=>a+s.party,0)}</text>`;
+    }
+    /* Walk-ons ride on the right-hand edge of the band, clear of the
+       place name — a green badge that means "this many got on here and
+       were never booked". */
+    if(wk){
+      marks += `<rect x="${W-36}" y="${cy-11}" width="28" height="22" rx="5"
+        fill="#146b3f"/><text x="${W-22}" y="${cy+5}" font-size="13"
+        font-weight="800" fill="#fff" text-anchor="middle">${wk}</text>`;
+    }
+    const lx = 60;
+    marks += `<text x="${lx}" y="${cy - (here?3:4)}" font-size="15"
+      font-weight="${here?"800":"500"}" fill="#11191f">${esc(n)}</text>`;
+    if(here){
+      marks += `<text x="${lx}" y="${cy+14}" font-size="12.5" fill="#4a5f6d">${
+        esc(here.map(s=>s.time + " " + s.who).join(" · ").slice(0,58))}</text>`;
+    }
+    /* The whole band is the target, not the dot. Cold hands, moving bus. */
+    marks += `<rect class="band" data-i="${i}" x="0" y="${cy-GAP/2}" width="${W}"
+      height="${GAP}" fill="transparent" style="cursor:pointer"/>`;
+  });
+
+  const box = el(`<div class="mapbox">
+    <p class="cap">The road in the order you drive it — drawn on this phone, so it
+      works with no signal. Not to scale and not a satnav.</p>
+    <div>
+      <svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto" role="img"
+           aria-label="Route strip map. Tap a stop.">
+        <path d="${d}" stroke="#b9cbd8" stroke-width="11" fill="none" stroke-linecap="round"/>
+        <path d="${d}" stroke="#ffffff" stroke-width="3" fill="none" stroke-linecap="round"/>
+        ${marks}
+      </svg>
+    </div>
+    <div class="selwrap"></div>
+  </div>`);
+
+  if(offline.length){
+    box.querySelector(".cap").insertAdjacentHTML("afterend",
+      `<p class="cap"><strong>${offline.length} pickup${offline.length===1?"":"s"}
+       not at a named stop</strong> — ${esc(offline.map(s=>s.place).join("; "))}.
+       Those are on the list below with the landmark.</p>`);
+  }
+
+  if(Object.keys(walkAt).length){
+    box.querySelector(".cap").insertAdjacentHTML("afterend",
+      `<p class="cap"><span style="display:inline-block;width:.8rem;height:.8rem;
+        background:#146b3f;border-radius:3px;vertical-align:-1px"></span>
+        green &mdash; got on without booking.</p>`);
+  }
+
+  box.querySelectorAll("rect.band").forEach(r=>{
+    r.addEventListener("click", () => {
+      state.mapSel = Number(r.dataset.i);
+      render();
+    });
+  });
+
+  if(state.mapSel != null){
+    const i = state.mapSel, here = at[i] || [];
+    const sel = el(`<div class="sel">
+      <b>${esc(stops[i])}</b>
+      ${here.length
+        ? here.map(s=>`${esc(s.time)} — ${esc(s.who)}${
+            s.party>1 ? ` and ${s.party-1} more` : ""}`).join("<br>")
+        : "Nobody booked here."}
+      <div class="btnwrap"></div>
+    </div>`);
+    const b = el(`<button>Somebody got on here</button>`);
+    b.onclick = () => { state.ask = {kind:"count", place:stops[i]}; render(); };
+    sel.querySelector(".btnwrap").appendChild(b);
+    box.querySelector(".selwrap").appendChild(sel);
+  }
 
   /* ------------------------------------------------------------------
-     DID ANYBODY GET OFF SOMEWHERE DIFFERENT?
+     AND THE REAL MAP UNDERNEATH IT
      ------------------------------------------------------------------
-     The operator's own design, and the reason this section is a LIST
-     rather than a set of questions:
+     The strip map above answers "who is ahead of me and in what order",
+     which is the question on the road. It cannot answer "where on earth
+     is that" - and it has to be asked, because a customer can pin a spot
+     on the road when they book, and that spot is not a named stop and
+     not on the strip.
 
-       "Unless you do it that it stays what's been booked and Malcolm
-        changes anything different."
-
-     So every passenger is already answered - it says where they booked
-     to - and he touches only the ones who did something else. A day where
-     everybody did what they said needs no taps at all and stores nothing.
-     Putting one back to its booked stop removes the correction, which is
-     also how he undoes a mis-tap without a delete button.
-
-     It lives here rather than on the run because he said so: "It ok
-     doesn't need to be done when he's driving, he generally stops to let
-     them off." Nothing on the roadside screen changed. */
-  const carried = (SHEET && SHEET.rows ? SHEET.rows : []).filter(r => {
-    const st = LOCAL[r.booking_id] !== undefined ? LOCAL[r.booking_id]
-             : (r.boarded ? "boarded" : (r.no_show ? "no_show" : null));
-    return st !== "no_show";
-  });
-
-  if(carried.length){
-    const changed = carried.filter(r => r.got_off_is_a_difference).length;
-    html += '<div class="card"><h2>Did anybody get off somewhere different?</h2>' +
-      '<p class="muted">Everybody below is already down as getting off where they booked. ' +
-      'Only change the ones who did not — if nobody did, there is nothing to do here.</p>' +
-      (changed
-        ? '<div class="good">' + changed +
-          (changed === 1 ? ' passenger got' : ' passengers got') + ' off somewhere different.</div>'
-        : '') +
-      '</div>';
-
-    carried.forEach(r => {
-      const opts = (STOPS[r.direction] || STOPS[(SHEET && SHEET.direction) || "outward"] || []);
-      html += '<div class="card' + (r.got_off_is_a_difference ? ' changed' : '') +
-        '" data-b="' + esc(r.booking_id) + '">' +
-        '<div class="name">' + esc(r.lead_name) + ' · ' + r.party_size +
-          (Number(r.party_size) === 1 ? " person" : " people") + '</div>' +
-        '<div class="sub">on at ' + esc(r.pickup) + ' · booked off at ' + esc(r.drop_off) + '</div>' +
-        (r.got_off_is_a_difference
-          ? '<div class="note">Got off at <strong>' + esc(r.got_off_at) + '</strong> — ' +
-            'not where they booked. Set it back to ' + esc(r.drop_off) + ' to undo this.</div>'
-          : '') +
-        '<label>Where did they actually get off?</label>' +
-        '<select data-off="' + esc(r.booking_id) + '">' +
-          opts.map(st =>
-            '<option value="' + esc(st.id) + '"' +
-            ((r.got_off_point_id && st.id === r.got_off_point_id) ||
-             (!r.got_off_is_a_difference && st.n === r.drop_off) ? ' selected' : '') +
-            '>' + esc(st.n) + (st.n === r.drop_off ? ' (as booked)' : '') + '</option>').join("") +
-        '</select>' +
-        /* Somewhere with no name is where people actually get off on this
-           road, and it is on no list. */
-        '<button class="btn ghost small" data-elsewhere="' + esc(r.booking_id) + '">' +
-          'Somewhere with no name…</button>' +
-        '</div>';
-    });
+     So the real map is offered, second, behind a tap, and the wording
+     says plainly that it needs signal. Nothing above it depends on it.
+  ------------------------------------------------------------------ */
+  const pinned = list.filter(s => s.lat != null && s.lng != null);
+  if(pinned.length){
+    const rb = el(`<button class="realbtn">${state.realMap
+      ? "Hide the real map"
+      : "Show it on a real map" + (offline.length
+          ? ` &mdash; where ${offline.length===1?"that pickup is":"those pickups are"}`
+          : "")}</button>`);
+    rb.onclick = () => { state.realMap = !state.realMap; render(); };
+    box.appendChild(rb);
+    if(state.realMap){
+      const slot = el(`<div class="realmap"></div>`);
+      box.appendChild(slot);
+      box.appendChild(el(`<p class="cap">The background needs signal. The road and
+        the numbered pins do not &mdash; they are kept on this phone once you have
+        opened it in the yard. The numbers are the order you meet them; green is
+        on board, red is not there.</p>`));
+      mountRealMap(slot, leg, pinned);
+    }
   }
 
-  html += '<button class="btn ghost" id="back2">Back to the run</button>';
-  M().innerHTML = html;
-
-  /* Where a booked passenger actually got off. */
-  M().querySelectorAll("select[data-off]").forEach(sel => {
-    sel.onchange = async () => {
-      const id = sel.dataset.off;
-      if(!sel.value) return;
-      try{
-        await rpc("bus_driver_different_alighting",
-          {p_booking_id: id, p_pickup_point_id: sel.value});
-        /* Re-fetch the run, not just this screen: the correction lives on
-           the sheet now, and a stale sheet would show his own change as
-           not having happened. */
-        await openDay(SHEET.date, SHEET.direction);
-        VIEW = "endofrun";
-        await loadEndOfRun();
-      }catch(e){ window.alert(say(e)); }
-    };
-  });
-  M().querySelectorAll("button[data-elsewhere]").forEach(btn => {
-    btn.onclick = async () => {
-      const id = btn.dataset.elsewhere;
-      const where = window.prompt(
-        "Where did they get off?\n\nWrite it the way you would say it — " +
-        "\"the passing place past the second cattle grid\".", "");
-      if(!where || !where.trim()) return;
-      try{
-        await rpc("bus_driver_different_alighting",
-          {p_booking_id: id, p_description: where.trim()});
-        await openDay(SHEET.date, SHEET.direction);
-        VIEW = "endofrun";
-        await loadEndOfRun();
-      }catch(e){ window.alert(say(e)); }
-    };
-  });
-
-  M().querySelectorAll("select[data-kind]").forEach(sel => {
-    sel.onchange = async () => {
-      const id = sel.closest(".card").dataset.w;
-      if(!sel.value) return;
-      try{
-        if(sel.dataset.kind === "walk_on_place"){
-          await rpc("bus_driver_update_walk_on", {p_walk_on_id: id, p_pickup_point_id: sel.value});
-        }else{
-          await rpc("bus_driver_set_walk_on_destination",
-            {p_walk_on_id: id, p_pickup_point_id: sel.value});
-        }
-        await loadEndOfRun();
-      }catch(e){ window.alert(say(e)); }
-    };
-  });
-  el("back2").onclick = () => { VIEW = "sheet"; render(); };
+  return box;
 }
 
-/* ------------------------------------------------------------------
-   Another day - have we space?
-   ------------------------------------------------------------------
-   From the operator: "someone could be traveling and say have you got
-   space on way back or next week". That is the question passengers ask
-   the man driving them, and until now he had to say he did not know.
-
-   HE MAY LOOK AND ONLY LOOK. No booking from the driver's phone - the
-   operator was asked directly and said so. There is no button here that
-   changes anything.
-
-   AND IT NEVER TOUCHES THE RUN HE IS ON. This is the part that would be
-   easy to get wrong: opening another day through openDay() replaces the
-   sheet AND clears LOCAL, the list of taps that have not reached the
-   database yet. He would come back to his own run with his last few taps
-   apparently undone, and tap them again. So this reads into its own
-   variable and leaves SHEET, LOCAL and the queue exactly where they were.
------------------------------------------------------------------- */
-let PEEK = null;   // {date, rows} - a day he is only looking at
-
-function renderOtherDays(){
-  el("title").textContent = "Another day";
-  let html = '<div class="card">' +
-    '<p class="muted">Only looking. Nothing here books anybody — if they want a seat, ' +
-    'they ring the office on 01520 722997.</p></div>';
-
-  if(!DAYS){
-    html += '<div class="card">Loading the days…</div>';
-  }else if(!DAYS.length){
-    html += '<div class="card"><p>No days came back. Pull down when you have signal.</p></div>';
-  }else{
-    DAYS.forEach(d => {
-      const out  = Number(d.seats_out);
-      const home = Number(d.seats_home);
-      const cls  = n => n <= 0 ? "gone" : (n <= 2 ? "low" : "");
-      html += '<button class="daybtn" data-peek="' + esc(d.service_date) + '">' +
-        '<span><strong>' + (d.is_today ? "Today" : esc(d.day_name)) + '</strong><br>' +
-        '<span class="muted">' + esc(niceDate(d.service_date)) +
-        (d.stood_down ? " · STOOD DOWN" : "") + '</span><br>' +
-        '<span class="seatline ' + cls(out) + '">' +
-          (out <= 0 ? "Full to Inverness" : out + " free to Inverness") + '</span>' +
-        ' <span class="seatline ' + cls(home) + '">' +
-          (home <= 0 ? "Full coming home" : home + " free coming home") + '</span>' +
-        '</span></button>';
-    });
-  }
-  html += '<button class="btn ghost" id="backrun">Back to my run</button>';
-  M().innerHTML = html;
-  M().querySelectorAll("button[data-peek]").forEach(b => {
-    b.onclick = () => peekDay(b.dataset.peek);
-  });
-  el("backrun").onclick = () => { VIEW = SHEET ? "sheet" : "days"; render(); };
-}
-
-async function peekDay(date){
-  PEEK = {date, rows: null};
-  VIEW = "peek"; render();
-  try{
-    /* The same read the run uses, into a DIFFERENT variable. Nothing about
-       the run he is driving is touched. */
-    PEEK = {date, rows: await rpc("bus_driver_sheet", {p_service_date: date}) || []};
-  }catch(e){
-    PEEK = {date, rows: [], error: say(e)};
-  }
-  render();
-}
-
-function renderPeek(){
-  el("title").textContent = "Another day";
-  const d = PEEK || {};
-  let html = '<div class="card"><h2>' + esc(niceDate(d.date)) + '</h2>' +
-    '<p class="muted">Only looking — you cannot change this day from here.</p>' +
-    (d.error ? '<div class="bad">' + esc(d.error) + '</div>' : '') + '</div>';
-
-  if(!d.rows){
-    html += '<div class="card">Loading…</div>';
-  }else if(!d.rows.length){
-    html += '<div class="card"><p>Nobody booked on that day yet.</p></div>';
-  }else{
-    ["outward", "return"].forEach(dir => {
-      const rows = d.rows.filter(r => r.direction === dir);
-      if(!rows.length) return;
-      html += '<div class="card"><h2>' +
-        (dir === "outward" ? "To Inverness" : "Coming home") + '</h2>';
-      rows.forEach(r => {
-        html += '<div class="pax">' +
-          '<div><span class="time">' + esc(hhmm(r.estimated_time || r.scheduled_time)) +
-            '</span><span class="stop">' + esc(r.pickup) + '</span></div>' +
-          '<div class="name">' + esc(r.lead_name) + ' · ' + r.party_size +
-            (Number(r.party_size) === 1 ? " person" : " people") + '</div>' +
-          '<div class="sub">off at ' + esc(r.drop_off) + '</div>' +
-          '</div>';
-      });
-      html += '</div>';
-    });
-  }
-  html += '<button class="btn ghost" id="backdays">Other days</button>' +
-    '<p></p><button class="btn ghost" id="backrun2">Back to my run</button>';
-  M().innerHTML = html;
-  el("backdays").onclick = () => { VIEW = "otherdays"; render(); };
-  el("backrun2").onclick = () => { VIEW = SHEET ? "sheet" : "days"; render(); };
-}
-
-/* ------------------------------------------------------------------
-   Running late
-   ------------------------------------------------------------------
-   THIS ONE NEEDS SIGNAL, and says so, because it is the one action on
-   this screen that reaches customers rather than the database. Queuing it
-   the way taps are queued would be worse than refusing it: a delay
-   message that arrives an hour later, from a lay-by with a bar of signal,
-   tells people the bus is late long after it has been and gone.
------------------------------------------------------------------- */
-let LATE = {};   // journey_id -> minutes, from bus_journey_state
-
-async function loadLate(journeyIds){
-  const out = {};
-  await Promise.all((journeyIds || []).map(async id => {
-    try{
-      const st = await rpc("bus_journey_state", {p_journey_id: id});
-      if(st && st.delay_minutes) out[id] = st.delay_minutes;
-    }catch(_){ /* no signal: the run itself still shows */ }
-  }));
-  LATE = out;
-}
-
-async function sayWeAreLate(journeyId){
-  if(!ONLINE){
-    window.alert("This one needs signal.\n\nIt sends a text and an email to everybody on " +
-      "the run, so it cannot wait in the queue the way your taps do — a delay message that " +
-      "arrives an hour late is worse than none. Try again when you have a bar, or ring the " +
-      "office and they can do it.");
-    return;
-  }
-  const now = LATE[journeyId];
-  const answer = window.prompt(
-    (now ? "Showing as about " + now + " minutes late just now.\n\nHow late are we NOW?\n\n" +
-           "Changing it tells everybody AGAIN."
-         : "How late are we, in minutes?\n\nEverybody on this run with a mobile or an email " +
-           "is told straight away.") +
-    "\n\n5 minutes to 8 hours.", String(now || 30));
-  if(answer === null) return;
-  const mins = parseInt(String(answer).trim(), 10);
-  if(!mins || mins < 5 || mins > 480){
-    window.alert("Just the number of minutes, between 5 and 480.");
-    return;
-  }
-  const why = window.prompt(
-    "Why? This goes out in the text — short, the way you would say it.\n\n" +
-    "\"Roadworks at Achnasheen\", \"waiting on the ferry\".", "");
-  if(why === null) return;
-  try{
-    const r = await rpc("bus_delay_journey",
-      {p_journey_id: journeyId, p_minutes: mins, p_reason: why.trim() || null, p_from: "driver"});
-    if(r && r.ok === false){ window.alert(r.message || "It did not go through."); return; }
-    await loadLate([journeyId]);
-    render();
-    window.alert((r && r.message) || "Everybody has been told.");
-  }catch(e){ window.alert(say(e)); }
-}
-
-async function sayWeAreOnTime(journeyId){
-  if(!window.confirm("Stop showing this run as late?\n\nNobody gets a message — a text " +
-      "saying the bus is no longer late is not worth sending.")) return;
-  try{
-    await rpc("bus_clear_delay", {p_journey_id: journeyId});
-    await loadLate([journeyId]);
-    render();
-  }catch(e){ window.alert(say(e)); }
-}
-
-/* ------------------------------------------------------------------
-   The run on a map
-   ------------------------------------------------------------------
-   From the operator, 1 September: "on the bus drivers app there is no
-   show me route with pickups."
-
-   Two things make this different from the office's map. First, HALF THIS
-   ROAD HAS NO SIGNAL, so the route line and every pick-up are kept on the
-   phone: opened in the yard before setting off, they are there all day.
-   The background tiles are the only part that needs data, and the page
-   says so rather than showing a blank rectangle and letting him wonder.
-
-   Second, the pins are numbered IN THE ORDER HE WILL MEET THEM, and
-   coloured by what has already happened - green for on, red for not
-   there. At a glance that is "who is still ahead of me".
------------------------------------------------------------------- */
+/* =====================================================================
+   THE REAL MAP
+   ---------------------------------------------------------------------
+   Kept from the version before this one. It earns its place for exactly
+   one thing the strip map cannot do: show a pickup that is not a named
+   stop. It is never load-bearing - if maplibre does not load, or the
+   tiles never arrive, the pins and the list are still there.
+   ===================================================================== */
 let RMAP = null, RMAPEL = null, RMARKERS = [];
-let ROUTE = recall(K.route, null);   // {outward: [[lng,lat]...], return: [...]}
+let ROUTE = recall("bus704.driver.route", null);
 
 async function loadRoute(){
   if(ROUTE && (ROUTE.outward || ROUTE.return)) return ROUTE;
@@ -930,80 +1463,47 @@ async function loadRoute(){
       return g && g.length ? g : null;
     };
     ROUTE = {outward: line("outward"), return: line("return")};
-    keep(K.route, ROUTE);
-  }catch(_){
-    ROUTE = recall(K.route, null);
-  }
+    keep("bus704.driver.route", ROUTE);
+  }catch(_){ ROUTE = recall("bus704.driver.route", null); }
   return ROUTE;
 }
 
-function renderRunMap(){
-  el("title").textContent = "The run";
-  const dir = (SHEET && SHEET.direction) || "outward";
-  const rows = (SHEET && SHEET.rows ? SHEET.rows : []).filter(r => r.direction === dir);
-  const withPlace = rows.filter(r => r.pickup_latitude != null && r.pickup_longitude != null);
-
-  let html = '<div class="card">' +
-    '<div class="pick">' +
-      '<button data-dir="outward" aria-pressed="' + (dir === "outward") + '">To Inverness</button>' +
-      '<button data-dir="return" aria-pressed="' + (dir === "return") + '">Home</button>' +
-    '</div>' +
-    '<p class="muted">' + withPlace.length +
-      (withPlace.length === 1 ? ' pick-up' : ' pick-ups') + ' on this run, numbered in the order ' +
-      'you will meet them. Green is on, red is not there.' +
-      (withPlace.length < rows.length
-        ? ' ' + (rows.length - withPlace.length) + ' of them have no position yet and are not on ' +
-          'the map — they are still on the list.'
-        : '') +
-    '</p>' +
-    '<div class="runmap" id="rmapslot"></div>' +
-    '<p class="muted">The background needs signal. The road and the pins do not — they are ' +
-    'kept on the phone once you have opened this in the yard.</p>' +
-    '</div>' +
-    '<button class="btn ghost" id="backmap">Back to the run</button>';
-
-  M().innerHTML = html;
-  M().querySelectorAll(".pick button").forEach(b => {
-    b.onclick = () => { SHEET.direction = b.dataset.dir; keep(K.sheet, SHEET); render(); };
-  });
-  el("backmap").onclick = () => { VIEW = "sheet"; render(); };
-  mountRunMap(dir, withPlace);
-}
-
-async function mountRunMap(dir, rows){
-  const slot = el("rmapslot");
-  if(!slot) return;
+async function mountRealMap(slot, leg, rows){
   if(typeof maplibregl === "undefined"){
-    slot.innerHTML = '<p style="padding:1rem">The map could not be loaded — that needs ' +
-      'signal. The run itself is on the list, which does not.</p>';
+    slot.innerHTML = '<p style="padding:1rem">The real map could not be loaded — ' +
+      'that needs signal. The strip map above it does not, and neither does the list.</p>';
     return;
   }
   await loadRoute();
-  const line = ROUTE && ROUTE[dir];
+  const line = ROUTE && ROUTE[leg];
 
   if(!RMAPEL){
     RMAPEL = document.createElement("div");
     RMAPEL.style.cssText = "height:100%;width:100%";
     slot.appendChild(RMAPEL);
-    RMAP = new maplibregl.Map({
-      container: RMAPEL,
-      style: {version: 8,
-        sources: {osm: {type: "raster", tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
-          tileSize: 256, attribution: "© OpenStreetMap contributors"}},
-        layers: [{id: "osm", type: "raster", source: "osm"}]},
-      center: [-5.0, 57.5], zoom: 7
-    });
+    try{
+      RMAP = new maplibregl.Map({
+        container: RMAPEL,
+        style: {version: 8,
+          sources: {osm: {type: "raster",
+            tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
+            tileSize: 256, attribution: "© OpenStreetMap contributors"}},
+          layers: [{id: "osm", type: "raster", source: "osm"}]},
+        center: [-5.0, 57.5], zoom: 7
+      });
+    }catch(_){ RMAPEL = null; return; }
     if(!RMAP){ RMAPEL = null; return; }
-    RMAP.addControl(new maplibregl.NavigationControl({showCompass: false}));
+    try{ RMAP.addControl(new maplibregl.NavigationControl({showCompass: false})); }catch(_){}
     /* The pins are drawn STRAIGHT AWAY, not on the map's load event. With
        no signal the background tiles never arrive, and waiting on load
        meant the one screen he opened at a road end came up empty - the
        map would have been load-bearing, which it must never be. */
     RMAP.on("load", () => {
       try{
-        RMAP.addSource("run", {type: "geojson", data: {type: "FeatureCollection", features: []}});
-        RMAP.addLayer({id: "run", type: "line", source: "run",
-          paint: {"line-color": "#1f5f8b", "line-width": 5, "line-opacity": .9}});
+        RMAP.addSource("run", {type:"geojson",
+          data:{type:"FeatureCollection", features:[]}});
+        RMAP.addLayer({id:"run", type:"line", source:"run",
+          paint:{"line-color":"#1f5f8b","line-width":5,"line-opacity":.9}});
       }catch(_){}
       drawRunLine(line);
     });
@@ -1018,211 +1518,685 @@ async function mountRunMap(dir, rows){
 function drawRunLine(line){
   if(!RMAP || !RMAP.getSource || !RMAP.getSource("run")) return;
   RMAP.getSource("run").setData(line
-    ? {type: "Feature", geometry: {type: "LineString", coordinates: line}}
-    : {type: "FeatureCollection", features: []});
+    ? {type:"Feature", geometry:{type:"LineString", coordinates:line}}
+    : {type:"FeatureCollection", features:[]});
 }
 
 function drawRunPins(rows, line){
   if(!RMAP) return;
-  RMARKERS.forEach(m => m.remove());
+  RMARKERS.forEach(m => { try{ m.remove(); }catch(_){} });
   RMARKERS = [];
 
   const bounds = new maplibregl.LngLatBounds();
   if(line) line.forEach(c => bounds.extend(c));
 
-  rows.forEach((r, i) => {
-    const state = LOCAL[r.booking_id] !== undefined ? LOCAL[r.booking_id]
-                 : (r.boarded ? "boarded" : (r.no_show ? "no_show" : null));
+  rows.forEach((s, i) => {
+    const tap = state.taps[s.ref];
     const box = document.createElement("div");
-    box.className = "pinlabel" + (state === "boarded" ? " done"
-                                : (state === "no_show" ? " gone" : ""));
+    box.className = "pinlabel" + (tap === "boarded" ? " done"
+                                : (tap === "no_show" ? " gone" : ""));
     box.textContent = String(i + 1);
-    const lngLat = [Number(r.pickup_longitude), Number(r.pickup_latitude)];
+    const lngLat = [Number(s.lng), Number(s.lat)];
+    /* The number is on the pin and RINGING THEM is in the popup - which is
+       the whole reason he opens a map at somebody's road end when they are
+       not standing at it. */
     const m = new maplibregl.Marker({element: box})
       .setLngLat(lngLat)
       .setPopup(new maplibregl.Popup({offset: 18}).setHTML(
-        '<strong>' + esc(r.lead_name) + '</strong><br>' +
-        esc(r.pickup) + (r.estimated_time ? ' · ' + esc(hhmm(r.estimated_time)) : '') + '<br>' +
-        r.party_size + (Number(r.party_size) === 1 ? ' person' : ' people') +
-        ' · off at ' + esc(r.drop_off) +
-        (r.telephone ? '<br><a href="tel:' +
-          esc(String(r.telephone).replace(/[^\d+]/g, "")) + '">Ring them</a>' : '')))
+        '<strong>' + esc(s.who) + '</strong><br>' +
+        esc(s.place) + (s.time ? ' &middot; ' + esc(s.time) : '') + '<br>' +
+        s.party + (s.party === 1 ? ' person' : ' people') +
+        ' &middot; off at ' + esc(s.dest) +
+        (s.tel ? '<br><a href="tel:' + esc(String(s.tel).replace(/[^\d+]/g, "")) +
+          '">Ring them</a>' : '')))
       .addTo(RMAP);
     RMARKERS.push(m);
     bounds.extend(lngLat);
   });
 
-  if(!bounds.isEmpty()) RMAP.fitBounds(bounds, {padding: 40, duration: 0, maxZoom: 13});
+  try{
+    if(!bounds.isEmpty()) RMAP.fitBounds(bounds, {padding:40, duration:0, maxZoom:13});
+  }catch(_){}
+}
+
+/* =====================================================================
+   RECORDING A WALK-ON
+   ---------------------------------------------------------------------
+   bus.record_walk_on() in the database will take a count on its own, with
+   no location at all, and still keep the record. This screen is built the
+   same way round: the count is the only thing asked for, and everything
+   else is either worked out or left for later. A refused tap is a pencil
+   and a scrap of paper, which is the thing this project exists to
+   replace.
+   ===================================================================== */
+/* ------------------------------------------------------------------
+   THE TWO ANSWERS ABOUT A WALK-ON, SENT TO THE DATABASE
+   ------------------------------------------------------------------
+   Where they got on and where they got off. Both are asked long after
+   the tap, both are asked where there is usually no signal, and both are
+   what Kay's Council return is counted from - so neither may be a note
+   that lives only on this phone.
+------------------------------------------------------------------ */
+function sayWalkOnPlace(w, name){
+  w.where = name; w.metres = null; w.needsDetail = false;
+  const id = STOP_ID[name];
+  enqueue("bus_driver_update_walk_on", {
+    p_walk_on_id: "@walkon:" + w.id,
+    p_count: null,
+    p_pickup_point_id: id || null,
+    p_alighting_pickup_point_id: null,
+    p_note: id ? null : name});
+}
+
+function sayWalkOnDest(w, name){
+  w.off = name;
+  const id = STOP_ID[name];
+  if(id) enqueue("bus_driver_set_walk_on_destination",
+    {p_walk_on_id: "@walkon:" + w.id, p_pickup_point_id: id});
+  else enqueue("bus_driver_update_walk_on",
+    {p_walk_on_id: "@walkon:" + w.id, p_count: null, p_pickup_point_id: null,
+     p_alighting_pickup_point_id: null, p_note: "got off at " + name});
+}
+
+function recordWalkOn(count, place){
+  const w = {
+    id: ++state.walkSeq,
+    at: hhmm(new Date()),
+    count: count,
+    leg: state.leg,
+    dayIdx: state.dayIdx,   /* which day it was recorded against */
+    where: place || null,
+    off: null,              /* where they got off — asked at the END of the run */
+    metres: null,
+    needsDetail: !place
+  };
+  state.walkOns.push(w);
+  state.ask = null;
+  render();
+  /* Where they got on is the PHONE'S job, asked for after the fact. If it
+     answers, the place fills itself in; if it does not, the record is
+     still kept and the place is asked at the end of the run. Either way
+     the count is safe the moment he taps. */
+  enqueue("bus_driver_walk_on", {
+    p_service_date: dateOfDay(state.dayIdx),
+    p_direction: state.leg,
+    p_count: count,
+    p_latitude: null, p_longitude: null, p_accuracy_metres: null,
+    p_pickup_point_id: place && STOP_ID[place] ? STOP_ID[place] : null,
+    p_occurred_at: new Date().toISOString(),
+    p_recorded_offline_at: state.online ? null : new Date().toISOString(),
+    p_note: place && !STOP_ID[place] ? place : null
+  }, {walkOn: w.id});
+
+  /* Then, quietly and after the fact, ask the phone where it is. He has
+     already finished. If it answers, the place fills itself in; if it
+     does not, the row simply says "Where did they get on?" and waits. */
+  if(!place) locate(w);
+}
+
+function locate(w, then){
+  if(!navigator.geolocation){ if(then) then(false); return; }
+  navigator.geolocation.getCurrentPosition(
+    pos => {
+      const near = nearestStops(pos.coords.latitude, pos.coords.longitude, w.leg)[0];
+      if(near){
+        w.where = near.name;
+        w.metres = near.metres;
+        /* Beyond four hundred metres the phone is guessing, and a guess
+           filed as a fact is worse than a blank. It goes in, and it goes
+           in marked - and it is NOT sent to the database as a place,
+           because a guess recorded as a fact is what the marking exists
+           to prevent. Malcolm is asked at the end of the run instead. */
+        w.needsDetail = near.metres > TOO_FAR_METRES;
+        if(!w.needsDetail) sayWalkOnPlace(w, near.name);
+      }
+      render();
+      if(then) then(true);
+    },
+    () => { render(); if(then) then(false); },
+    {enableHighAccuracy:true, timeout:8000, maximumAge:60000}
+  );
+}
+
+/* =====================================================================
+   THE SHEETS THAT SLIDE UP
+   ===================================================================== */
+function renderSheet(){
+  if(!state.ask) return;
+  const a = state.ask;
+  let inner;
+
+  if(a.kind === "count"){
+    /* ONE QUESTION. How many. Nothing else is asked at the roadside, and
+       there is nowhere to type a fare — the ticket machine owns the
+       money and duplicating it here is the thing we were told not to
+       build. */
+    inner = el(`<div class="inner">
+      <h2>How many got on?</h2>
+      <p class="sub">${a.place
+        ? "At " + esc(a.place) + ". "
+        : ""}That is all — tap the number and carry on. Where you are is worked
+        out afterwards.</p>
+      <div class="pad"></div>
+    </div>`);
+    const pad = inner.querySelector(".pad");
+    [1,2,3,4,5,6].forEach(n=>{
+      const b = el(`<button>${n}</button>`);
+      b.onclick = () => recordWalkOn(n, a.place);
+      pad.appendChild(b);
+    });
+    const more = el(`<button class="more">More<br>than 6</button>`);
+    more.onclick = () => { state.ask = {kind:"many", place:a.place}; render(); };
+    pad.appendChild(more);
+
+  } else if(a.kind === "many"){
+    inner = el(`<div class="inner">
+      <h2>How many?</h2>
+      <p class="sub">A school run or a walking party. Tap the number.</p>
+      <div class="pad"></div>
+    </div>`);
+    const pad = inner.querySelector(".pad");
+    [7,8,9,10,11,12,13,14,15,16].forEach(n=>{
+      const b = el(`<button>${n}</button>`);
+      b.onclick = () => recordWalkOn(n, a.place);
+      pad.appendChild(b);
+    });
+
+  } else if(a.kind === "late"){
+    /* Big numbers, same as the count pad. He is not typing on a phone at
+       a road end; he is choosing from six. */
+    inner = el(`<div class="inner">
+      <h2>${a.ahead ? `How late will ${esc(a.day)}'s bus be?` : "How late are you?"}</h2>
+      <p class="sub">${a.ahead
+        ? `Roughly is fine. Everybody booked on ${esc(a.day)} gets told now &mdash; which is
+           worth far more to them than finding out at the road end.`
+        : `Roughly is fine. Everybody on today's run who has a mobile or an email gets told
+           straight away. Anyone you have already picked up is skipped &mdash; they are
+           sitting behind you.`}</p>
+      <div class="pad"></div>
+    </div>`);
+    const pad = inner.querySelector(".pad");
+    [15,30,45,60,90,120].forEach(n=>{
+      const b = el(`<button class="more">${n}<br>min</button>`);
+      b.onclick = () => {
+        state.late[state.dayIdx] = {mins:n};
+        /* THE ONE THING HERE THAT NEEDS SIGNAL, and it says so. A delay
+           message that arrives an hour later, from a lay-by, tells people
+           the bus is late long after it has been and gone - so it is
+           refused rather than queued. */
+        if(!state.online){
+          window.alert("This one needs signal — it texts and emails everybody on the run, "
+            + "so it cannot wait in the queue the way your taps do. Try again when you have "
+            + "a bar, or ring the office and they will do it.");
+          delete state.late[state.dayIdx];
+        }else{
+          const jid = journeyIdFor(state.dayIdx, state.leg);
+          if(jid) rpc("bus_delay_journey", {p_journey_id: jid, p_minutes: n,
+                       p_reason: null, p_from: "driver"}).catch(e => window.alert(say(e)));
+        }
+        state.ask = null;
+        state.pending++;
+        render();
+        if(state.online) setTimeout(()=>{ state.pending=0; render(); }, 700);
+      };
+      pad.appendChild(b);
+    });
+    if(state.late[state.dayIdx]){
+      const off = el(`<button class="cancel">${a.ahead
+        ? "It will be on time after all — stop showing it"
+        : "On time after all — stop showing it"}</button>`);
+      off.onclick = () => {
+        /* Deliberately silent. Nobody needs a message saying the bus is no
+           longer late; they need one when it is. */
+        delete state.late[state.dayIdx]; state.ask = null; render();
+        const jid = journeyIdFor(state.dayIdx, state.leg);
+        if(jid) rpc("bus_clear_delay", {p_journey_id: jid}).catch(() => {});
+      };
+      inner.appendChild(off);
+    }
+
+  } else if(a.kind === "receipt"){
+    /* WHAT IT IS FOR, then the camera. Two taps, and the amount is
+       deliberately optional — asking a man holding a fuel nozzle to type
+       84.50 correctly is how you get 8450. Kay reads it off the picture. */
+    inner = el(`<div class="inner">
+      <h2>Photograph the receipt</h2>
+      <p class="sub">The picture is enough on its own. You do not have to type the amount
+        &mdash; the office reads it off. Take another if you fill up again later.</p>
+      <ul class="places"></ul>
+    </div>`);
+    const ul = inner.querySelector(".places");
+    [["Fuel","&#9981;"],["AdBlue","&#128167;"],["Both on one receipt","&#129534;"]].forEach(([label,icon])=>{
+      const li = el(`<li><button class="primary">${icon} ${label}</button></li>`);
+      li.querySelector("button").onclick = () => {
+        state.receiptSeq++;
+        state.receipts.push({id:state.receiptSeq, dayIdx:state.dayIdx,
+          at:hhmm(new Date()), kind:label, amount:null});
+        state.ask = null;
+        state.pending++;
+        render();
+        if(state.online) setTimeout(()=>{ state.pending=0; render(); }, 700);
+      };
+      ul.appendChild(li);
+    });
+
+  } else if(a.kind === "dest"){
+    /* WHERE THEY GOT OFF. End of the run, handbrake on. Kay needs it for
+       the Council return, and the driver is told that plainly — a question
+       with a reason attached gets answered. */
+    const w = state.walkOns.find(x=>x.id === a.id);
+    if(!w){ state.ask = null; return; }
+    inner = el(`<div class="inner">
+      <h2>Where did they get off?</h2>
+      <p class="sub">${w.count} ${w.count===1?"person":"people"} who got on
+        ${w.where ? "at " + esc(w.where) : ""} at ${esc(w.at)}.
+        Kay needs this for the Council return.</p>
+      <ul class="places"></ul>
+    </div>`);
+    const ul = inner.querySelector(".places");
+
+    /* Inverness first on the way in, Applecross first on the way home.
+       Nine times out of ten it is the end of the line, so the end of the
+       line goes at the top rather than at the bottom of fifteen. */
+    const stops = STOPS[w.leg];
+    const likely = stops[stops.length-1];
+    const rest = stops.filter(n => n !== likely && n !== w.where);
+    const pick = name => () => {
+      sayWalkOnDest(w, name);
+      state.ask = null; render();
+    };
+
+    const first = el(`<li><button class="primary">${esc(likely)}
+      <span class="m">All the way &mdash; usually the answer</span></button></li>`);
+    first.querySelector("button").onclick = pick(likely);
+    ul.appendChild(first);
+
+    rest.forEach(name=>{
+      const li = el(`<li><button>${esc(name)}</button></li>`);
+      li.querySelector("button").onclick = pick(name);
+      ul.appendChild(li);
+    });
+
+    const later = el(`<li><button>I cannot remember
+      <span class="m">Leave it blank. The office would rather have a gap than a guess.</span>
+      </button></li>`);
+    later.querySelector("button").onclick = () => { state.ask = null; render(); };
+    ul.appendChild(later);
+
+  } else if(a.kind === "dropped"){
+    /* A BOOKED PASSENGER WHO GOT OFF SOMEWHERE ELSE. The operator's own
+       idea, and the only reason this screen is short: everybody else is
+       assumed to have done what they said, so there is nothing to confirm. */
+    inner = el(`<div class="inner">
+      <h2>Where did they actually get off?</h2>
+      <p class="sub">They booked to ${esc(a.leg)}. What gets recorded is only the
+        difference &mdash; the booking itself is left exactly as it was.</p>
+      <ul class="places"></ul>
+    </div>`);
+    const ul = inner.querySelector(".places");
+    /* Both directions offered, because a booking's own leg is not always
+       the leg he is standing on when he remembers. */
+    [...new Set(STOPS.outward)].forEach(name=>{
+      if(name === a.leg) return;
+      const li = el(`<li><button>${esc(name)}</button></li>`);
+      li.querySelector("button").onclick = () => {
+        state.dropped[a.ref] = name; state.ask = null;
+        /* Never written back onto the booking: the booked stages are the
+           basis of the fare and of the Council claim. This is a
+           DIFFERENCE, stored beside them. */
+        const ds = findStop(a.ref);
+        if(ds && ds.bookingId) enqueue("bus_driver_different_alighting",
+          {p_booking_id: ds.bookingId, p_pickup_point_id: null,
+           p_description: name, p_note: null});
+        state.pending++; render();
+        if(state.online) setTimeout(()=>{ state.pending=0; render(); }, 600);
+      };
+      ul.appendChild(li);
+    });
+
+  } else {
+    /* SAYING WHERE, LATER. Parked, handbrake on, or that evening at home.
+       Nothing here is urgent and the wording says so. */
+    const w = state.walkOns.find(x=>x.id === a.id);
+    if(!w){ state.ask = null; return; }
+    inner = el(`<div class="inner">
+      <h2>Where did they get on?</h2>
+      <p class="sub">${w.count} ${w.count===1?"person":"people"} at ${esc(w.at)}.
+        Kay needs this for the Council return, but it can wait until you have
+        stopped.</p>
+      <ul class="places"></ul>
+    </div>`);
+    const ul = inner.querySelector(".places");
+
+    const here = el(`<li><button class="primary">Use where I am now
+      <span class="m">Best if you are still at the spot</span></button></li>`);
+    here.querySelector("button").onclick = (ev) => {
+      const btn = ev.currentTarget;
+      btn.innerHTML = "Asking the phone…";
+      locate(w, ok => {
+        if(ok){ state.ask = null; render(); }
+        else {
+          btn.innerHTML = `The phone could not say where you are
+            <span class="m">No signal or location turned off — pick from the list instead</span>`;
+        }
+      });
+    };
+    ul.appendChild(here);
+
+    /* The list is offered whether or not the phone managed a fix, because
+       the phone can be confidently wrong on that road — the wrong side of
+       a village is 400 metres and two fare stages. */
+    STOPS[w.leg].forEach(name=>{
+      const li = el(`<li><button>${esc(name)}${
+        name === w.where ? `<span class="m">what the phone thought</span>` : ""}</button></li>`);
+      li.querySelector("button").onclick = () => {
+        sayWalkOnPlace(w, name);
+        state.ask = null; render();
+      };
+      ul.appendChild(li);
+    });
+
+    const later = el(`<li><button>Leave it for now
+      <span class="m">The ${w.count} ${w.count===1?"person":"people"} and the time are
+      already saved. Nothing is lost.</span></button></li>`);
+    later.querySelector("button").onclick = () => { state.ask = null; render(); };
+    ul.appendChild(later);
+  }
+
+  const cancel = el(`<button class="cancel">Close &mdash; record nothing</button>`);
+  cancel.onclick = () => { state.ask = null; render(); };
+  inner.appendChild(cancel);
+
+  const sheet = el(`<div class="sheet"></div>`);
+  sheet.appendChild(inner);
+  /* Tapping the dark area closes it. Tapping the sheet itself must not —
+     a fat thumb on the edge of a button should never throw the job away. */
+  sheet.addEventListener("click", ev => {
+    if(ev.target === sheet){ state.ask = null; render(); }
+  });
+  document.body.appendChild(sheet);
 }
 
 /* ------------------------------------------------------------------
-   Doing things
+   HAVE YOU GOT SPACE?
+   ------------------------------------------------------------------
+   The operator's own words: "someone could be traveling and say have you
+   got space on way back or next week". That is the question passengers
+   ask the man driving them, and until now he had to say he did not know.
+
+   HE MAY LOOK AND ONLY LOOK. There is no button on this phone that books
+   anybody - the operator was asked directly and said so. What he can do
+   is answer, and then tell them to ring the office.
+
+   It is not a separate screen. The day tabs across the top already open
+   any day's sheet, so the seats simply go ON those tabs and on the two
+   direction cards. One less thing to find, and it works with no signal
+   because the days came down with the rest of the sheet.
 ------------------------------------------------------------------ */
-function todayISO(){ return new Date().toISOString().slice(0, 10); }
+function seatsOn(i, leg){
+  const row = DAYROWS[i];
+  if(!row) return null;
+  const n = leg === "return" ? row.seats_home : row.seats_out;
+  return n === null || n === undefined ? null : Number(n);
+}
+function seatWords(n){
+  if(n === null) return "";
+  if(n <= 0) return "FULL";
+  return n + " seat" + (n === 1 ? "" : "s") + " free";
+}
 
-function tap(bookingId, event){
-  const row = SHEET.rows.find(r => r.booking_id === bookingId);
-  const current = LOCAL[bookingId] !== undefined ? LOCAL[bookingId]
-                 : (row.boarded ? "boarded" : (row.no_show ? "no_show" : null));
-  if(current === event){
-    /* Tapping the same one again undoes it - the wrong button gets
-       pressed, in the dark, with gloves on. */
-    LOCAL[bookingId] = null;
-    enqueue("bus_driver_untap", {p_booking_id: bookingId, p_event: event});
-  }else{
-    LOCAL[bookingId] = event;
-    enqueue("bus_driver_tap", {
-      p_booking_id: bookingId, p_event: event,
-      p_occurred_at: new Date().toISOString(),
-      p_recorded_offline_at: ONLINE ? null : new Date().toISOString()
-    });
-  }
+/* A day he is not driving today is a day he may look at and nothing more.
+   Ticking somebody onto next Monday's bus is not a thing that can have
+   happened, and offering it invites a tap that would have to be undone. */
+function lookOnly(){ return !isTodayIdx(state.dayIdx); }
+
+/* WHICH DAY IS TODAY IS THE DATABASE'S ANSWER, NOT THE PHONE'S.
+   A phone with the wrong date - or one being looked at the night before -
+   would otherwise treat the wrong day as the one he is driving, and the
+   two places that ask ("is this look-only?" and "does the tab say
+   Today?") could disagree with each other. The day list already carries
+   is_today, so both ask it. The clock is only the fallback for a phone
+   that has never had signal. */
+function isTodayIdx(i){
+  const row = DAYROWS[i];
+  if(row && row.is_today !== undefined && row.is_today !== null) return !!row.is_today;
+  const d = DAYS[i];
+  return !!d && ymd(d) === ymd(TODAY);
+}
+
+function setTap(ref, what){
+  if(lookOnly()) return;
+  /* Tapping the same thing twice is harmless. Tapping the other one
+     replaces it: somebody marked absent who then got on is not evidence
+     of anything. */
+  if(state.taps[ref]===what) return;
+  state.taps[ref]=what;
   render();
-}
-
-function walkOn(){
-  const raw = window.prompt("How many got on?\n\n(Where they got on and off can wait until " +
-    "the end of the run. Just the number now.)", "1");
-  if(raw === null) return;
-  const n = parseInt(raw, 10);
-  if(!(n >= 1)) return window.alert("That has to be a number, one or more.");
-
-  const send = (lat, lng, acc) => {
-    enqueue("bus_driver_walk_on", {
-      p_service_date: SHEET.date, p_direction: SHEET.direction, p_count: n,
-      p_latitude: lat, p_longitude: lng, p_accuracy_metres: acc,
+  /* REAL NOW. It goes on the queue, which sends it the moment there is a
+     bar and holds it on the phone until then. The tap is never waiting on
+     the network - that is the whole design of this screen. */
+  const s = findStop(ref);
+  if(s && s.bookingId){
+    enqueue("bus_driver_tap", {
+      p_booking_id: s.bookingId, p_event: what,
       p_occurred_at: new Date().toISOString(),
-      p_recorded_offline_at: ONLINE ? null : new Date().toISOString()
+      p_recorded_offline_at: state.online ? null : new Date().toISOString()
     });
-    MSG = n + (n === 1 ? " person" : " people") + " recorded. Where they got on and off " +
-      "is asked at the end of the run.";
-    render();
-    setTimeout(() => { MSG = null; render(); }, 6000);
-  };
-
-  /* The phone's own position saves the driver typing a place name at a
-     road end. It is never required: refusing it costs one question at
-     the end of the run and nothing else.
-
-     THE WALK-ON IS RECORDED WHETHER OR NOT THE POSITION ARRIVES. Some
-     phones, and some browsers, never call either callback - permission
-     half-granted, the chip warming up, or the option timeout ignored.
-     A driver must not lose two passengers to a sulking GPS, so this
-     has its own clock and gives up on itself. */
-  let sent = false;
-  const once = (lat, lng, acc) => { if(!sent){ sent = true; send(lat, lng, acc); } };
-  if(navigator.geolocation){
-    setTimeout(() => once(null, null, null), 6000);
-    try{
-      navigator.geolocation.getCurrentPosition(
-        p => once(p.coords.latitude, p.coords.longitude, Math.round(p.coords.accuracy || 0)),
-        () => once(null, null, null),
-        {enableHighAccuracy: true, timeout: 5000, maximumAge: 30000});
-    }catch(_){ once(null, null, null); }
-  }else{
-    once(null, null, null);
   }
 }
 
-const STOPS = {};
-async function loadStops(){
-  for(const dir of ["outward", "return"]){
-    if(STOPS[dir]) continue;
-    try{
-      const s = await rpc("bus_stops", {p_direction: dir});
-      STOPS[dir] = s.map(x => ({id: x.id, n: x.name, o: Number(x.route_order)}))
-                    .sort((a, b) => a.o - b.o);
-      keep("bus704.driver.stops." + dir, STOPS[dir]);
-    }catch(_){
-      STOPS[dir] = recall("bus704.driver.stops." + dir, []);
+/* Undoing a tap must reach the database too, or the sheet and the record
+   disagree the moment he reloads. */
+function clearTap(ref){
+  const had = state.taps[ref];
+  delete state.taps[ref];
+  render();
+  const s = findStop(ref);
+  if(s && s.bookingId && had) enqueue("bus_driver_untap",
+    {p_booking_id: s.bookingId, p_event: had});
+}
+
+function findStop(ref){
+  for(const sh of SHEETS){
+    for(const leg of ["outward","return"]){
+      const hit = (sh[leg]||[]).find(x => x.ref === ref);
+      if(hit) return hit;
     }
   }
+  return null;
 }
 
-async function loadDays(){
-  try{
-    DAYS = await rpc("bus_driver_upcoming", {p_count: 8});
-    keep(K.days, DAYS);
-  }catch(e){
-    if(!DAYS) MSG = say(e);
-  }
-  render();
-}
+/* The signal state is the phone's own, not a toggle. */
+state.online = navigator.onLine !== false;
 
-async function openDay(date, direction){
-  VIEW = "sheet";
-  const keepDir = direction || (SHEET && SHEET.date === date ? SHEET.direction : null) || "outward";
-  if(!SHEET || SHEET.date !== date) SHEET = {date, direction: keepDir, rows: [], summary: null};
-  SHEET.direction = keepDir;
-  render();
-  try{
-    const [summary, rows] = await Promise.all([
-      rpc("bus_driver_day", {p_service_date: date}),
-      rpc("bus_driver_sheet", {p_service_date: date})
-    ]);
-    SHEET = {date, direction: keepDir, summary, rows: rows || [],
-             fetched_at: new Date().toISOString()};
-    /* The same call the office makes, so the road and the office cannot
-       describe the same morning differently. */
-    await loadLate([...new Set((rows || []).map(r => r.journey_id).filter(Boolean))]);
-    LOCAL = {};
-    keep(K.sheet, SHEET);
-    ONLINE = true;
-  }catch(e){
-    /* No signal, or no sheet yet. If the phone already holds this day,
-       show it and say how old it is - which is the whole point. */
-    if(!SHEET.rows.length && !SHEET.fetched_at) MSG = say(e);
-    ONLINE = navigator.onLine !== false ? ONLINE : false;
-  }
-  render();
-}
-
-async function loadEndOfRun(){
-  render();
-  await loadStops();
-  try{
-    const [summary, outstanding] = await Promise.all([
-      rpc("bus_driver_end_of_run", {p_service_date: SHEET.date}),
-      rpc("bus_driver_outstanding", {p_service_date: SHEET.date})
-    ]);
-    ENDRUN = {summary, outstanding: outstanding || []};
-  }catch(e){
-    ENDRUN = {summary: {finished: false}, outstanding: []};
-    MSG = say(e);
-  }
-  render();
+function journeyIdFor(dayIdx, leg){
+  const sh = SHEETS[dayIdx];
+  if(!sh) return null;
+  const row = (sh[leg] || [])[0];
+  return row ? row.journeyId : null;
 }
 
 /* ------------------------------------------------------------------
-   Start
+   Getting in, and getting the day
 ------------------------------------------------------------------ */
-el("signout").onclick = () => {
-  if(QUEUE.length && !window.confirm(
-      QUEUE.length + " tap" + (QUEUE.length === 1 ? " has" : "s have") +
-      " not been sent yet. Signing out will lose them. Sign out anyway?")) return;
-  setSession(null); ME = null;
-  forget(K.sheet); forget(K.days); forget(K.queue);
-  QUEUE = []; SHEET = null; DAYS = null; VIEW = "days";
-  render();
-};
-el("back").onclick = () => {
-  VIEW = VIEW === "endofrun" ? "sheet" : "days";
-  render();
-};
-
-async function afterSignIn(){
-  M().innerHTML = '<div class="card">Just a moment…</div>';
-  try{ ME = await rpc("bus_staff_whoami", {}); }
-  catch(e){ setSession(null); ME = null; return render(); }
-  if(!ME.active) return render();
-  VIEW = "days";
-  render();
-  flush();
-  loadDays();
-  loadStops();
+function renderSignIn(msg){
+  document.getElementById("signin").classList.remove("hidden");
+  document.getElementById("app").innerHTML = "";
+  document.getElementById("signin").innerHTML =
+    '<main style="padding:1rem;max-width:640px;margin:0 auto">' +
+    '<div class="signincard">' +
+    '<p class="place">Sign in</p>' +
+    '<p class="detail">Your usual Ross Group staff login — the same one you use for ' +
+    'tyres and the rest. There is no separate bus password.</p>' +
+    (msg ? '<p class="flag ovr">' + esc(msg) + '</p>' : '') +
+    '<p style="margin:.7rem 0 .2rem"><label for="em">Email address</label></p>' +
+    '<input id="em" type="email" autocomplete="username" inputmode="email" ' +
+    'style="width:100%;font:inherit;padding:.7rem;border:2px solid var(--line);border-radius:9px">' +
+    '<p style="margin:.7rem 0 .2rem"><label for="pw">Password</label></p>' +
+    '<input id="pw" type="password" autocomplete="current-password" ' +
+    'style="width:100%;font:inherit;padding:.7rem;border:2px solid var(--line);border-radius:9px">' +
+    '<button id="go" class="signinbtn" style="margin-top:1rem">Sign in</button>' +
+    '</div></main>';
+  document.getElementById("go").onclick = async () => {
+    try{
+      await signIn(document.getElementById("em").value.trim(),
+                   document.getElementById("pw").value);
+      document.getElementById("signin").classList.add("hidden");
+      await boot();
+    }catch(e){ renderSignIn(say(e)); }
+  };
 }
 
-if(SESSION) afterSignIn(); else render();
+async function boot(){
+  try{
+    ME = await rpc("bus_staff_whoami");
+  }catch(e){
+    if(e.status === 401 || /JWT|token/i.test(String(e.code))){
+      SESSION = null; forget(K.session); return renderSignIn("Please sign in again.");
+    }
+    ME = null;
+  }
+  /* A GARAGE LOGIN THAT HAS NOT BEEN GIVEN THE BUS YET.
+     This is not the same as a dead account, and telling a driver his
+     account is not active when it is would send him to the wrong person.
+     It is one line on the staff screen Duncan already uses, and saying so
+     is the difference between a two-minute fix and a phone call. */
+  if(ME && ME.has_login_but_no_bus_access){
+    document.getElementById("app").innerHTML =
+      '<div class="empty"><strong>Your login does not open the bus yet.</strong><br><br>' +
+      'Signed in as ' + esc(ME.name || ME.email || "") + ', but the bus has not been ' +
+      'switched on for you.<br><br>Ask Duncan — it is one line on the staff screen he ' +
+      'already uses. Same login, no new password.</div>';
+    return;
+  }
+  if(ME && ME.active === false){
+    document.getElementById("app").innerHTML =
+      '<div class="empty">Your account cannot open the bus screens. Ask Duncan.</div>';
+    return;
+  }
+  await loadEverything();
+  /* WHAT THE DATABASE SAYS IS STILL UNANSWERED.
+     Walk-ons live in the database from the moment he taps, but the
+     questions about them - where they got on, where they got off - were
+     only ever held in this page. Reload the phone and they vanished from
+     the screen while sitting unanswered in Kay's Council return. This
+     puts them back. */
+  seedCorrections();
+  await loadOutstanding();
+  await loadLate();
+  state.pending = QUEUE.length;
+  flush();
+  render();
+}
+
+/* Just the office's summary, on its own, for when he opens the finish
+   screen. Quiet: if there is no signal the last figures stay up and the
+   list he has to answer is on the phone regardless. */
+async function refreshEndRun(){
+  const date = dateOfDay(todayIdx());
+  if(!date) return;
+  try{
+    const said = await rpc("bus_driver_end_of_run", {p_service_date: date});
+    if(said && typeof said === "object" && !Array.isArray(said)){
+      ENDRUN = said;
+      if(state.view === "finish") render();
+    }
+  }catch(_){}
+}
+
+/* ------------------------------------------------------------------
+   The questions the database still wants answered
+------------------------------------------------------------------ */
+/* A CORRECTION ALREADY IN THE DATABASE.
+   Made last night, or from the office, or before this phone was reloaded.
+   Without this it vanishes off the screen while sitting in the record,
+   and he makes it a second time. */
+function seedCorrections(){
+  (SHEETS || []).forEach(day => {
+    ["outward","return"].forEach(leg => {
+      (day[leg] || []).forEach(s => {
+        if(s.gotOff) state.dropped[s.ref] = s.gotOff;
+        /* AND THE TICKS THEMSELVES. A boarding already in the database -
+           tapped this morning before the phone was reloaded, or by
+           whoever drove the first half - has to be on the screen. Without
+           this every tick vanishes on reload while sitting in the record,
+           and he taps them all again. */
+        if(!state.taps[s.ref]){
+          if(s.boarded) state.taps[s.ref] = "boarded";
+          else if(s.noShow) state.taps[s.ref] = "no_show";
+        }
+      });
+    });
+  });
+}
+
+async function loadOutstanding(){
+  /* The day he is DRIVING, which the database names - not simply the
+     first row, for the same reason as isTodayIdx. */
+  let i = 0;
+  for(let k = 0; k < DAYS.length; k++){ if(isTodayIdx(k)){ i = k; break; } }
+  const date = dateOfDay(i);
+  if(!date) return;
+  let rows = [];
+  try{ rows = await rpc("bus_driver_outstanding", {p_service_date: date}); }
+  catch(_){ return; }   /* no signal: what is on the phone still shows */
+  if(!Array.isArray(rows)) return;
+
+  rows.forEach(r => {
+    if(!r.walk_on_id) return;
+    /* Already on this phone under its own id - do not ask twice. */
+    const known = Object.keys(WALKON_IDS).some(k => WALKON_IDS[k] === r.walk_on_id);
+    if(known) return;
+    const localId = ++state.walkSeq;
+    WALKON_IDS[localId] = r.walk_on_id;
+    state.walkOns.push({
+      id: localId,
+      at: r.occurred_at ? hhmm(new Date(r.occurred_at)) : "—",
+      count: Number(r.boarded_count) || 1,
+      leg: r.direction === "return" ? "return" : "outward",
+      dayIdx: i,
+      where: r.got_on_at || null,
+      off: null,
+      metres: null,
+      needsDetail: !r.got_on_at
+    });
+  });
+  try{ keep(K.walkons, WALKON_IDS); }catch(_){}
+
+  /* The end-of-run summary. Read only, and only ever used to say how the
+     day went - nothing on this screen depends on it arriving. */
+  try{ ENDRUN = await rpc("bus_driver_end_of_run", {p_service_date: date}); }
+  catch(_){ ENDRUN = null; }
+}
+let ENDRUN = null;
+
+/* ------------------------------------------------------------------
+   Running late, as the OFFICE last left it
+   ------------------------------------------------------------------
+   The delay can be set from the office screen as well as from here, and
+   a driver looking at a phone that says nothing while his passengers
+   have all had a text saying twenty minutes is worse than no feature.
+------------------------------------------------------------------ */
+function todayIdx(){
+  for(let k = 0; k < DAYS.length; k++){ if(isTodayIdx(k)) return k; }
+  return 0;
+}
+
+async function loadLate(){
+  const ids = [];
+  ["outward","return"].forEach(leg => {
+    const list = (SHEETS[todayIdx()] || {})[leg] || [];
+    if(list.length && list[0].journeyId) ids.push(list[0].journeyId);
+  });
+  await Promise.all(ids.map(async id => {
+    try{
+      const st = await rpc("bus_journey_state", {p_journey_id: id});
+      if(st && st.delay_minutes) state.late[todayIdx()] = {mins: Number(st.delay_minutes)};
+    }catch(_){}
+  }));
+}
+
+if(SESSION) boot(); else renderSignIn();
 </script>
 </body>
 </html>
