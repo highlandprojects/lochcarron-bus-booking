@@ -106,7 +106,11 @@
   .checks input{width:22px;height:22px;min-height:0;flex:0 0 auto;margin-top:2px}
   .mapholder{height:340px;width:100%;border:1px solid var(--line);border-radius:10px;
              overflow:hidden;margin-top:.5rem}
-  #staffmap{height:100%;width:100%}
+  /* ANY map inside a holder, not one named map. This was bound to
+     #staffmap by id, so the amend panel's map rendered into a box of zero
+     height and came out as a blank white rectangle - and the test that was
+     supposed to catch it only asked whether the map EXISTED. */
+  .mapholder > div{height:100%;width:100%}
   .muted{color:var(--ink-soft);font-size:.88rem}
   /* What do I say? — one question per row, tap to open. Big targets,
      because this is used one-handed with a telephone in the other. */
