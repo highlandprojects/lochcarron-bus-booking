@@ -77,6 +77,18 @@
   .bk .ref{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.8rem;color:var(--ink-soft)}
   .bk .where{font-size:.9rem;color:var(--ink-soft)}
   .bk .acts{display:flex;gap:.4rem;flex-wrap:wrap}
+  /* The day as a table. It scrolls sideways inside its own box rather than
+     pushing the whole page about, because the office screen is sometimes a
+     laptop in the corner of the workshop. */
+  .tablewrap{overflow-x:auto;margin-top:.6rem;border:1px solid var(--line);border-radius:10px}
+  table.day{min-width:640px}
+  table.day td{vertical-align:top}
+  table.day .num{text-align:right;font-variant-numeric:tabular-nums;font-weight:700;
+                 white-space:nowrap}
+  table.day tr.bk{border-top:0}
+  table.day .where{font-size:.85rem}
+  table.day .acts{flex-direction:column;align-items:stretch}
+  .chip.ok{background:var(--green-wash,#e2f1e9);color:var(--green,#16663f)}
   table{width:100%;border-collapse:collapse}
   th,td{padding:.5rem .55rem;text-align:left;border-bottom:1px solid #eef2f5;font-size:.9rem;
         vertical-align:top}
@@ -795,28 +807,56 @@ function renderDay(){
 
       if(!bks.length){
         html += '<p class="muted" style="margin:.7rem 0 0">Nobody booked yet.</p>';
+      }else{
+        /* THE DAY AS A TABLE, which is what the July prototype had and what
+           this screen never got. Columns in the order the office reads
+           them: where the bus stops, who is standing there, how many, where
+           they are going, and how to reach them.
+
+           The CONTACT column carries the thing the whole system turns on -
+           whether anything can reach this passenger automatically. On the
+           worst morning of the year that column is the difference between
+           a text and somebody having to ring. It is a badge rather than a
+           sentence because it is scanned, not read. */
+        html += '<div class="tablewrap"><table class="day">' +
+          '<thead><tr>' +
+            '<th>On at</th><th>Who</th><th class="num">No.</th>' +
+            '<th>Off at</th><th>Contact</th><th></th>' +
+          '</tr></thead><tbody>';
+        bks.forEach(b => {
+          const extras = [];
+          if(b.requirements)    extras.push('Needs: ' + prettyReqs(b.requirements));
+          if(b.override_reason) extras.push('Seat 13/14 because: ' + b.override_reason);
+          if(b.notes)           extras.push('Note: ' + b.notes);
+
+          html += '<tr class="bk" data-id="' + esc(b.booking_id) + '">' +
+            '<td><strong>' + esc(b.pickup) + '</strong>' +
+              (b.estimated_time
+                ? '<div class="where">due ' + esc(String(b.estimated_time).slice(0, 5)) + '</div>'
+                : '') + '</td>' +
+            '<td><strong>' + esc(b.lead_name) + '</strong>' +
+              (b.other_passengers
+                ? '<div class="where">with ' +
+                  esc(String(b.other_passengers).split("\n").filter(Boolean).join(", ")) +
+                  '</div>' : '') +
+              '<div class="ref">' + esc(b.reference) + '</div>' +
+              (extras.length
+                ? '<div class="where">' + esc(extras.join(" · ")) + '</div>' : '') +
+              (b.is_override ? '<span class="chip warn">seat 13/14</span>' : '') + '</td>' +
+            '<td class="num">' + b.party_size + '</td>' +
+            '<td>' + esc(b.destination) + '</td>' +
+            '<td>' + (b.contact ? esc(b.contact) : '<span class="muted">none</span>') +
+              '<div>' + (b.telephone_only
+                ? '<span class="chip tel">telephone only — nothing reaches them</span>'
+                : '<span class="chip ok">can be texted</span>') + '</div></td>' +
+            '<td><div class="acts">' +
+              '<button class="btn secondary small" data-act="amend">Amend booking</button>' +
+              '<button class="btn danger small" data-act="cancel">Cancel</button>' +
+            '</div></td>' +
+          '</tr>';
+        });
+        html += '</tbody></table></div>';
       }
-      bks.forEach(b => {
-        html += '<div class="bk" data-id="' + esc(b.booking_id) + '">' +
-          '<div class="main">' +
-            '<div><strong>' + esc(b.lead_name) + '</strong> · ' + b.party_size +
-              (Number(b.party_size) === 1 ? " person" : " people") +
-              (b.telephone_only ? ' <span class="chip tel">telephone only</span>' : '') +
-              (b.is_override ? ' <span class="chip warn">seat 13/14</span>' : '') + '</div>' +
-            '<div class="where">' + esc(b.pickup) + ' → ' + esc(b.destination) +
-              (b.estimated_time ? ' · due ' + esc(String(b.estimated_time).slice(0, 5)) : '') + '</div>' +
-            '<div class="ref">' + esc(b.reference) +
-              (b.contact ? ' · ' + esc(b.contact) : '') + '</div>' +
-            (b.requirements ? '<div class="where">Needs: ' + esc(prettyReqs(b.requirements)) + '</div>' : '') +
-            (b.override_reason ? '<div class="where">Seat 13/14 because: ' + esc(b.override_reason) + '</div>' : '') +
-            (b.notes ? '<div class="where">Note: ' + esc(b.notes) + '</div>' : '') +
-          '</div>' +
-          '<div class="acts">' +
-            '<button class="btn secondary small" data-act="amend">Amend booking</button>' +
-            '<button class="btn danger small" data-act="cancel">Cancel</button>' +
-          '</div>' +
-        '</div>';
-      });
       html += '</div>';
     });
   }
