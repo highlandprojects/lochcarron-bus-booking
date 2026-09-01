@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#164a6d">
 <title>Service 704 — the driver</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/4.7.1/maplibre-gl.min.css">
 <style>
   :root{
     --ink:#121c25; --ink-soft:#4a6272; --line:#c2d0d9; --paper:#fff; --wash:#eaf0f4;
@@ -100,6 +101,16 @@
          display:flex;gap:.5rem;max-width:760px;margin:0 auto}
   .stick .btn{min-height:52px}
   .card.changed{border-left:5px solid var(--amber)}
+  /* The run on a map. Tall, because it is looked at on a phone held in
+     one hand at the side of a road. */
+  .runmap{height:64vh;min-height:340px;border:1px solid var(--line);border-radius:12px;
+          overflow:hidden;background:var(--wash)}
+  .runmap .maplibregl-map{height:100%;width:100%}
+  .pinlabel{background:var(--blue);color:#fff;font-weight:700;font-size:.85rem;
+            border-radius:999px;min-width:26px;height:26px;display:flex;align-items:center;
+            justify-content:center;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4)}
+  .pinlabel.done{background:var(--green)}
+  .pinlabel.gone{background:var(--red)}
   .btn.small{min-height:44px;font-size:.95rem;margin-top:.5rem}
   .hidden{display:none !important}
 </style>
@@ -115,6 +126,7 @@
 <div id="banner"></div>
 <main id="main"><div class="card">Loading…</div></main>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/4.7.1/maplibre-gl.min.js"></script>
 <script>
 "use strict";
 /* =====================================================================
@@ -145,7 +157,8 @@ const K = {
   session: "bus704.driver.session",
   queue:   "bus704.driver.queue",
   sheet:   "bus704.driver.sheet",
-  days:    "bus704.driver.days"
+  days:    "bus704.driver.days",
+  route:   "bus704.driver.route"
 };
 
 /* ------------------------------------------------------------------
@@ -277,7 +290,7 @@ setInterval(() => { if(QUEUE.length) flush(); }, 20000);
 /* ------------------------------------------------------------------
    State
 ------------------------------------------------------------------ */
-let VIEW = "days";           // days | sheet | endofrun
+let VIEW = "days";           // days | sheet | endofrun | runmap
 let DAYS = recall(K.days, null);
 let SHEET = recall(K.sheet, null);   // {date, direction, fetched_at, summary, rows}
 let LOCAL = {};              // booking_id -> "boarded" | "no_show" | null, before the send
@@ -351,6 +364,7 @@ function render(){
   el("back").classList.toggle("hidden", VIEW === "days");
   if(VIEW === "sheet") return renderSheet();
   if(VIEW === "endofrun") return renderEndOfRun();
+  if(VIEW === "runmap") return renderRunMap();
   return renderDays();
 }
 
@@ -506,7 +520,8 @@ function renderSheet(){
       '</div></div>';
   });
 
-  html += '<button class="btn secondary" id="walkon">Somebody flagged us down</button>' +
+  html += '<button class="btn secondary" id="runmap">Show me the run on a map</button>' +
+    '<p></p><button class="btn secondary" id="walkon">Somebody flagged us down</button>' +
     '<p></p><button class="btn ghost" id="refresh">Fetch the list again</button>' +
     '<p></p><button class="btn ghost" id="endrun">End of the run</button>';
 
@@ -525,6 +540,7 @@ function renderSheet(){
     b.onclick = () => tap(b.closest(".pax").dataset.id, b.dataset.act);
   });
   el("walkon").onclick = walkOn;
+  if(el("runmap")) el("runmap").onclick = () => { VIEW = "runmap"; render(); };
   el("refresh").onclick = () => openDay(SHEET.date, SHEET.direction);
   el("endrun").onclick = () => { VIEW = "endofrun"; ENDRUN = null; loadEndOfRun(); };
 }
@@ -681,6 +697,160 @@ function renderEndOfRun(){
     };
   });
   el("back2").onclick = () => { VIEW = "sheet"; render(); };
+}
+
+/* ------------------------------------------------------------------
+   The run on a map
+   ------------------------------------------------------------------
+   From the operator, 1 September: "on the bus drivers app there is no
+   show me route with pickups."
+
+   Two things make this different from the office's map. First, HALF THIS
+   ROAD HAS NO SIGNAL, so the route line and every pick-up are kept on the
+   phone: opened in the yard before setting off, they are there all day.
+   The background tiles are the only part that needs data, and the page
+   says so rather than showing a blank rectangle and letting him wonder.
+
+   Second, the pins are numbered IN THE ORDER HE WILL MEET THEM, and
+   coloured by what has already happened - green for on, red for not
+   there. At a glance that is "who is still ahead of me".
+------------------------------------------------------------------ */
+let RMAP = null, RMAPEL = null, RMARKERS = [];
+let ROUTE = recall(K.route, null);   // {outward: [[lng,lat]...], return: [...]}
+
+async function loadRoute(){
+  if(ROUTE && (ROUTE.outward || ROUTE.return)) return ROUTE;
+  try{
+    const cfg = await rpc("bus_page_config", {});
+    const r = (cfg && cfg.routes) || {};
+    const line = d => {
+      const g = r[d] && r[d].geometry && r[d].geometry.coordinates;
+      return g && g.length ? g : null;
+    };
+    ROUTE = {outward: line("outward"), return: line("return")};
+    keep(K.route, ROUTE);
+  }catch(_){
+    ROUTE = recall(K.route, null);
+  }
+  return ROUTE;
+}
+
+function renderRunMap(){
+  el("title").textContent = "The run";
+  const dir = (SHEET && SHEET.direction) || "outward";
+  const rows = (SHEET && SHEET.rows ? SHEET.rows : []).filter(r => r.direction === dir);
+  const withPlace = rows.filter(r => r.pickup_latitude != null && r.pickup_longitude != null);
+
+  let html = '<div class="card">' +
+    '<div class="pick">' +
+      '<button data-dir="outward" aria-pressed="' + (dir === "outward") + '">To Inverness</button>' +
+      '<button data-dir="return" aria-pressed="' + (dir === "return") + '">Home</button>' +
+    '</div>' +
+    '<p class="muted">' + withPlace.length +
+      (withPlace.length === 1 ? ' pick-up' : ' pick-ups') + ' on this run, numbered in the order ' +
+      'you will meet them. Green is on, red is not there.' +
+      (withPlace.length < rows.length
+        ? ' ' + (rows.length - withPlace.length) + ' of them have no position yet and are not on ' +
+          'the map — they are still on the list.'
+        : '') +
+    '</p>' +
+    '<div class="runmap" id="rmapslot"></div>' +
+    '<p class="muted">The background needs signal. The road and the pins do not — they are ' +
+    'kept on the phone once you have opened this in the yard.</p>' +
+    '</div>' +
+    '<button class="btn ghost" id="backmap">Back to the run</button>';
+
+  M().innerHTML = html;
+  M().querySelectorAll(".pick button").forEach(b => {
+    b.onclick = () => { SHEET.direction = b.dataset.dir; keep(K.sheet, SHEET); render(); };
+  });
+  el("backmap").onclick = () => { VIEW = "sheet"; render(); };
+  mountRunMap(dir, withPlace);
+}
+
+async function mountRunMap(dir, rows){
+  const slot = el("rmapslot");
+  if(!slot) return;
+  if(typeof maplibregl === "undefined"){
+    slot.innerHTML = '<p style="padding:1rem">The map could not be loaded — that needs ' +
+      'signal. The run itself is on the list, which does not.</p>';
+    return;
+  }
+  await loadRoute();
+  const line = ROUTE && ROUTE[dir];
+
+  if(!RMAPEL){
+    RMAPEL = document.createElement("div");
+    RMAPEL.style.cssText = "height:100%;width:100%";
+    slot.appendChild(RMAPEL);
+    RMAP = new maplibregl.Map({
+      container: RMAPEL,
+      style: {version: 8,
+        sources: {osm: {type: "raster", tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
+          tileSize: 256, attribution: "© OpenStreetMap contributors"}},
+        layers: [{id: "osm", type: "raster", source: "osm"}]},
+      center: [-5.0, 57.5], zoom: 7
+    });
+    if(!RMAP){ RMAPEL = null; return; }
+    RMAP.addControl(new maplibregl.NavigationControl({showCompass: false}));
+    /* The pins are drawn STRAIGHT AWAY, not on the map's load event. With
+       no signal the background tiles never arrive, and waiting on load
+       meant the one screen he opened at a road end came up empty - the
+       map would have been load-bearing, which it must never be. */
+    RMAP.on("load", () => {
+      try{
+        RMAP.addSource("run", {type: "geojson", data: {type: "FeatureCollection", features: []}});
+        RMAP.addLayer({id: "run", type: "line", source: "run",
+          paint: {"line-color": "#1f5f8b", "line-width": 5, "line-opacity": .9}});
+      }catch(_){}
+      drawRunLine(line);
+    });
+  }else{
+    slot.appendChild(RMAPEL);
+    if(RMAP) RMAP.resize();
+    drawRunLine(line);
+  }
+  drawRunPins(rows, line);
+}
+
+function drawRunLine(line){
+  if(!RMAP || !RMAP.getSource || !RMAP.getSource("run")) return;
+  RMAP.getSource("run").setData(line
+    ? {type: "Feature", geometry: {type: "LineString", coordinates: line}}
+    : {type: "FeatureCollection", features: []});
+}
+
+function drawRunPins(rows, line){
+  if(!RMAP) return;
+  RMARKERS.forEach(m => m.remove());
+  RMARKERS = [];
+
+  const bounds = new maplibregl.LngLatBounds();
+  if(line) line.forEach(c => bounds.extend(c));
+
+  rows.forEach((r, i) => {
+    const state = LOCAL[r.booking_id] !== undefined ? LOCAL[r.booking_id]
+                 : (r.boarded ? "boarded" : (r.no_show ? "no_show" : null));
+    const box = document.createElement("div");
+    box.className = "pinlabel" + (state === "boarded" ? " done"
+                                : (state === "no_show" ? " gone" : ""));
+    box.textContent = String(i + 1);
+    const lngLat = [Number(r.pickup_longitude), Number(r.pickup_latitude)];
+    const m = new maplibregl.Marker({element: box})
+      .setLngLat(lngLat)
+      .setPopup(new maplibregl.Popup({offset: 18}).setHTML(
+        '<strong>' + esc(r.lead_name) + '</strong><br>' +
+        esc(r.pickup) + (r.estimated_time ? ' · ' + esc(hhmm(r.estimated_time)) : '') + '<br>' +
+        r.party_size + (Number(r.party_size) === 1 ? ' person' : ' people') +
+        ' · off at ' + esc(r.drop_off) +
+        (r.telephone ? '<br><a href="tel:' +
+          esc(String(r.telephone).replace(/[^\d+]/g, "")) + '">Ring them</a>' : '')))
+      .addTo(RMAP);
+    RMARKERS.push(m);
+    bounds.extend(lngLat);
+  });
+
+  if(!bounds.isEmpty()) RMAP.fitBounds(bounds, {padding: 40, duration: 0, maxZoom: 13});
 }
 
 /* ------------------------------------------------------------------
