@@ -101,6 +101,10 @@
          display:flex;gap:.5rem;max-width:760px;margin:0 auto}
   .stick .btn{min-height:52px}
   .card.changed{border-left:5px solid var(--amber)}
+  .seatline{display:inline-block;font-size:.85rem;font-weight:700;color:var(--green);
+            background:var(--green-wash);border-radius:999px;padding:.1rem .5rem;margin-top:.25rem}
+  .seatline.low{color:var(--amber);background:var(--amber-wash)}
+  .seatline.gone{color:var(--red);background:var(--red-wash)}
   /* The run on a map. Tall, because it is looked at on a phone held in
      one hand at the side of a road. */
   .runmap{height:64vh;min-height:340px;border:1px solid var(--line);border-radius:12px;
@@ -290,7 +294,7 @@ setInterval(() => { if(QUEUE.length) flush(); }, 20000);
 /* ------------------------------------------------------------------
    State
 ------------------------------------------------------------------ */
-let VIEW = "days";           // days | sheet | endofrun | runmap
+let VIEW = "days";           // days | sheet | endofrun | runmap | otherdays | peek
 let DAYS = recall(K.days, null);
 let SHEET = recall(K.sheet, null);   // {date, direction, fetched_at, summary, rows}
 let LOCAL = {};              // booking_id -> "boarded" | "no_show" | null, before the send
@@ -365,6 +369,8 @@ function render(){
   if(VIEW === "sheet") return renderSheet();
   if(VIEW === "endofrun") return renderEndOfRun();
   if(VIEW === "runmap") return renderRunMap();
+  if(VIEW === "otherdays") return renderOtherDays();
+  if(VIEW === "peek") return renderPeek();
   return renderDays();
 }
 
@@ -538,7 +544,8 @@ function renderSheet(){
       : '<button class="btn secondary" data-late="' + esc(jid) + '">We are running late</button><p></p>');
   }
 
-  html += '<button class="btn secondary" id="runmap">Show me the run on a map</button>' +
+  html += '<button class="btn secondary" id="otherdays">Another day — have we space?</button>' +
+    '<p></p><button class="btn secondary" id="runmap">Show me the run on a map</button>' +
     '<p></p><button class="btn secondary" id="walkon">Somebody flagged us down</button>' +
     '<p></p><button class="btn ghost" id="refresh">Fetch the list again</button>' +
     '<p></p><button class="btn ghost" id="endrun">End of the run</button>';
@@ -559,6 +566,7 @@ function renderSheet(){
   });
   el("walkon").onclick = walkOn;
   if(el("runmap")) el("runmap").onclick = () => { VIEW = "runmap"; render(); };
+  if(el("otherdays")) el("otherdays").onclick = () => { VIEW = "otherdays"; loadDays(); render(); };
   M().querySelectorAll("button[data-late]").forEach(b => {
     b.onclick = () => sayWeAreLate(b.dataset.late);
   });
@@ -721,6 +729,109 @@ function renderEndOfRun(){
     };
   });
   el("back2").onclick = () => { VIEW = "sheet"; render(); };
+}
+
+/* ------------------------------------------------------------------
+   Another day - have we space?
+   ------------------------------------------------------------------
+   From the operator: "someone could be traveling and say have you got
+   space on way back or next week". That is the question passengers ask
+   the man driving them, and until now he had to say he did not know.
+
+   HE MAY LOOK AND ONLY LOOK. No booking from the driver's phone - the
+   operator was asked directly and said so. There is no button here that
+   changes anything.
+
+   AND IT NEVER TOUCHES THE RUN HE IS ON. This is the part that would be
+   easy to get wrong: opening another day through openDay() replaces the
+   sheet AND clears LOCAL, the list of taps that have not reached the
+   database yet. He would come back to his own run with his last few taps
+   apparently undone, and tap them again. So this reads into its own
+   variable and leaves SHEET, LOCAL and the queue exactly where they were.
+------------------------------------------------------------------ */
+let PEEK = null;   // {date, rows} - a day he is only looking at
+
+function renderOtherDays(){
+  el("title").textContent = "Another day";
+  let html = '<div class="card">' +
+    '<p class="muted">Only looking. Nothing here books anybody — if they want a seat, ' +
+    'they ring the office on 01520 722997.</p></div>';
+
+  if(!DAYS){
+    html += '<div class="card">Loading the days…</div>';
+  }else if(!DAYS.length){
+    html += '<div class="card"><p>No days came back. Pull down when you have signal.</p></div>';
+  }else{
+    DAYS.forEach(d => {
+      const out  = Number(d.seats_out);
+      const home = Number(d.seats_home);
+      const cls  = n => n <= 0 ? "gone" : (n <= 2 ? "low" : "");
+      html += '<button class="daybtn" data-peek="' + esc(d.service_date) + '">' +
+        '<span><strong>' + (d.is_today ? "Today" : esc(d.day_name)) + '</strong><br>' +
+        '<span class="muted">' + esc(niceDate(d.service_date)) +
+        (d.stood_down ? " · STOOD DOWN" : "") + '</span><br>' +
+        '<span class="seatline ' + cls(out) + '">' +
+          (out <= 0 ? "Full to Inverness" : out + " free to Inverness") + '</span>' +
+        ' <span class="seatline ' + cls(home) + '">' +
+          (home <= 0 ? "Full coming home" : home + " free coming home") + '</span>' +
+        '</span></button>';
+    });
+  }
+  html += '<button class="btn ghost" id="backrun">Back to my run</button>';
+  M().innerHTML = html;
+  M().querySelectorAll("button[data-peek]").forEach(b => {
+    b.onclick = () => peekDay(b.dataset.peek);
+  });
+  el("backrun").onclick = () => { VIEW = SHEET ? "sheet" : "days"; render(); };
+}
+
+async function peekDay(date){
+  PEEK = {date, rows: null};
+  VIEW = "peek"; render();
+  try{
+    /* The same read the run uses, into a DIFFERENT variable. Nothing about
+       the run he is driving is touched. */
+    PEEK = {date, rows: await rpc("bus_driver_sheet", {p_service_date: date}) || []};
+  }catch(e){
+    PEEK = {date, rows: [], error: say(e)};
+  }
+  render();
+}
+
+function renderPeek(){
+  el("title").textContent = "Another day";
+  const d = PEEK || {};
+  let html = '<div class="card"><h2>' + esc(niceDate(d.date)) + '</h2>' +
+    '<p class="muted">Only looking — you cannot change this day from here.</p>' +
+    (d.error ? '<div class="bad">' + esc(d.error) + '</div>' : '') + '</div>';
+
+  if(!d.rows){
+    html += '<div class="card">Loading…</div>';
+  }else if(!d.rows.length){
+    html += '<div class="card"><p>Nobody booked on that day yet.</p></div>';
+  }else{
+    ["outward", "return"].forEach(dir => {
+      const rows = d.rows.filter(r => r.direction === dir);
+      if(!rows.length) return;
+      html += '<div class="card"><h2>' +
+        (dir === "outward" ? "To Inverness" : "Coming home") + '</h2>';
+      rows.forEach(r => {
+        html += '<div class="pax">' +
+          '<div><span class="time">' + esc(hhmm(r.estimated_time || r.scheduled_time)) +
+            '</span><span class="stop">' + esc(r.pickup) + '</span></div>' +
+          '<div class="name">' + esc(r.lead_name) + ' · ' + r.party_size +
+            (Number(r.party_size) === 1 ? " person" : " people") + '</div>' +
+          '<div class="sub">off at ' + esc(r.drop_off) + '</div>' +
+          '</div>';
+      });
+      html += '</div>';
+    });
+  }
+  html += '<button class="btn ghost" id="backdays">Other days</button>' +
+    '<p></p><button class="btn ghost" id="backrun2">Back to my run</button>';
+  M().innerHTML = html;
+  el("backdays").onclick = () => { VIEW = "otherdays"; render(); };
+  el("backrun2").onclick = () => { VIEW = SHEET ? "sheet" : "days"; render(); };
 }
 
 /* ------------------------------------------------------------------
