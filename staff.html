@@ -762,6 +762,22 @@ function renderDay(){
             ? '<span class="chip warn">' + row.overrides + ' on seat 13/14</span>' : '') +
           (row.bookable_office !== "ok"
             ? '<span class="chip warn">office: ' + esc(row.bookable_office) + '</span>' : '') +
+          (DELAY[row.journey_id]
+            ? '<span class="chip warn">running about ' + Number(DELAY[row.journey_id]) +
+              ' minutes late</span>' : '') +
+        '</div>' +
+
+        /* RUNNING LATE. Written on 30 July, tested since, and until now
+           there was no button anywhere - so the one morning it was needed,
+           nobody could have used it. Agreed in July for the driver, the
+           tills AND the office, because a delay is discovered by whoever
+           discovers it. */
+        '<div class="acts" style="margin-top:.6rem">' +
+          '<button class="btn secondary small" data-late="' + esc(row.journey_id) + '">' +
+            (DELAY[row.journey_id] ? 'Change how late it is' : 'Running late') + '</button>' +
+          (DELAY[row.journey_id]
+            ? '<button class="btn secondary small" data-ontime="' + esc(row.journey_id) + '">' +
+              'It is running on time again</button>' : '') +
         '</div>';
 
       if(!bks.length){
@@ -811,6 +827,67 @@ function renderDay(){
       return openAmend(b);
     };
   });
+  M().querySelectorAll("button[data-late]").forEach(btn => {
+    btn.onclick = () => runningLate(btn.dataset.late);
+  });
+  M().querySelectorAll("button[data-ontime]").forEach(btn => {
+    btn.onclick = () => onTimeAgain(btn.dataset.ontime);
+  });
+}
+
+/* ------------------------ Running late ------------------------
+   The three judgements below were settled in July and live in the
+   database, not here. The screen's job is only to be honest about what
+   pressing the button will do BEFORE it is pressed - because this is one
+   of the two buttons in the whole system that reaches customers the
+   instant it is pressed. */
+async function runningLate(journeyId){
+  const row = (day.journeys || []).find(r => r.journey_id === journeyId);
+  const now = DELAY[journeyId];
+  const answer = window.prompt(
+    (now ? "This run is already showing as about " + now + " minutes late.\n\n" +
+           "How late is it NOW, in minutes?\n\nChanging it TELLS EVERYBODY AGAIN — " +
+           "which is right, because " + now + " minutes becoming something else is news."
+        : "How late is the bus, in minutes?\n\nEverybody on this run who has a mobile or " +
+          "an email is told straight away.") +
+    "\n\nBetween 5 minutes and 8 hours. Longer than that is a stand-down, not a delay.",
+    String(now || 30));
+  if(answer === null) return;
+  const mins = parseInt(String(answer).trim(), 10);
+  if(!mins || mins < 5 || mins > 480){
+    window.alert("Give it as a number of minutes, between 5 and 480.");
+    return;
+  }
+  const why = window.prompt(
+    "Why is it late? This goes out in the text, so keep it short and say it the way " +
+    "you would on the telephone.\n\n\"Roadworks at Achnasheen\", \"waiting on the ferry\".", "");
+  if(why === null) return;
+
+  try{
+    const r = await rpc("bus_delay_journey",
+      {p_journey_id: journeyId, p_minutes: mins, p_reason: why.trim() || null, p_from: "office"});
+    if(r && r.ok === false){
+      window.alert(r.message || say({code: r.reason}, "changed"));
+      return;
+    }
+    await loadDay();
+    window.alert((r && r.message) ||
+      ("Everybody on this run has been told it is about " + mins + " minutes late."));
+  }catch(e){ window.alert(say(e, "changed")); }
+}
+
+async function onTimeAgain(journeyId){
+  /* Deliberately quiet, and the confirmation says so: nobody needs a text
+     telling them the bus is no longer late. They needed one when it was. */
+  if(!window.confirm(
+      "Stop showing this run as late?\n\nNobody is messaged about this — a text saying " +
+      "the bus is no longer late is not worth sending. It just stops showing here and on " +
+      "the driver's screen.")) return;
+  try{
+    const r = await rpc("bus_clear_delay", {p_journey_id: journeyId});
+    await loadDay();
+    window.alert((r && r.message) || "No longer showing as delayed.");
+  }catch(e){ window.alert(say(e, "changed")); }
 }
 
 async function loadDay(){
@@ -821,6 +898,16 @@ async function loadDay(){
       rpc("bus_staff_day_bookings", {p_service_date: day.date})
     ]);
     day.journeys = j || []; day.bookings = b || [];
+    /* What is up with each run right now. One call per journey, and the
+       SAME call the driver's screen makes - so the office and the road
+       cannot describe the same morning differently. */
+    DELAY = {};
+    await Promise.all((day.journeys || []).map(async r => {
+      try{
+        const st = await rpc("bus_journey_state", {p_journey_id: r.journey_id});
+        if(st && st.delay_minutes) DELAY[r.journey_id] = st.delay_minutes;
+      }catch(_){ /* the day is still worth showing without it */ }
+    }));
   }catch(e){
     day.journeys = []; day.bookings = []; day.message = say(e);
   }
@@ -852,6 +939,7 @@ async function doCancel(b){
    up on Monday's sheet believing they are booked for Saturday. A different
    day is a cancel and a rebook, which leaves both facts on the record. */
 let AMEND = null;   // {b, party, pickup, dest, mobile, email, landline, note, others}
+let DELAY = {};     // journey_id -> minutes late, from bus_journey_state
 
 async function openAmend(b){
   AMEND = {

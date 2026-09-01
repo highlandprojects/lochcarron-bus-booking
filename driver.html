@@ -520,6 +520,24 @@ function renderSheet(){
       '</div></div>';
   });
 
+  /* RUNNING LATE, from the road. Agreed in July for the driver, the tills
+     and the office, because a delay is discovered by whoever discovers it -
+     and most often that is him, stopped, with something to tell fourteen
+     people. Same shape as the walk-on button for the same reason. */
+  const jid = (SHEET.summary && SHEET.summary.journeys || [])
+                .filter(x => x.direction === SHEET.direction)
+                .map(x => x.journey_id)[0]
+              || (rows[0] && rows[0].journey_id);
+  if(jid){
+    html += (LATE[jid]
+      ? '<div class="note"><strong>Showing as about ' + Number(LATE[jid]) +
+        ' minutes late.</strong> The office and the tills see this too.</div>' +
+        '<button class="btn secondary" data-late="' + esc(jid) + '">Change how late we are</button>' +
+        '<p></p><button class="btn ghost" data-ontime="' + esc(jid) + '">We are back on time</button>' +
+        '<p></p>'
+      : '<button class="btn secondary" data-late="' + esc(jid) + '">We are running late</button><p></p>');
+  }
+
   html += '<button class="btn secondary" id="runmap">Show me the run on a map</button>' +
     '<p></p><button class="btn secondary" id="walkon">Somebody flagged us down</button>' +
     '<p></p><button class="btn ghost" id="refresh">Fetch the list again</button>' +
@@ -541,6 +559,12 @@ function renderSheet(){
   });
   el("walkon").onclick = walkOn;
   if(el("runmap")) el("runmap").onclick = () => { VIEW = "runmap"; render(); };
+  M().querySelectorAll("button[data-late]").forEach(b => {
+    b.onclick = () => sayWeAreLate(b.dataset.late);
+  });
+  M().querySelectorAll("button[data-ontime]").forEach(b => {
+    b.onclick = () => sayWeAreOnTime(b.dataset.ontime);
+  });
   el("refresh").onclick = () => openDay(SHEET.date, SHEET.direction);
   el("endrun").onclick = () => { VIEW = "endofrun"; ENDRUN = null; loadEndOfRun(); };
 }
@@ -697,6 +721,73 @@ function renderEndOfRun(){
     };
   });
   el("back2").onclick = () => { VIEW = "sheet"; render(); };
+}
+
+/* ------------------------------------------------------------------
+   Running late
+   ------------------------------------------------------------------
+   THIS ONE NEEDS SIGNAL, and says so, because it is the one action on
+   this screen that reaches customers rather than the database. Queuing it
+   the way taps are queued would be worse than refusing it: a delay
+   message that arrives an hour later, from a lay-by with a bar of signal,
+   tells people the bus is late long after it has been and gone.
+------------------------------------------------------------------ */
+let LATE = {};   // journey_id -> minutes, from bus_journey_state
+
+async function loadLate(journeyIds){
+  const out = {};
+  await Promise.all((journeyIds || []).map(async id => {
+    try{
+      const st = await rpc("bus_journey_state", {p_journey_id: id});
+      if(st && st.delay_minutes) out[id] = st.delay_minutes;
+    }catch(_){ /* no signal: the run itself still shows */ }
+  }));
+  LATE = out;
+}
+
+async function sayWeAreLate(journeyId){
+  if(!ONLINE){
+    window.alert("This one needs signal.\n\nIt sends a text and an email to everybody on " +
+      "the run, so it cannot wait in the queue the way your taps do — a delay message that " +
+      "arrives an hour late is worse than none. Try again when you have a bar, or ring the " +
+      "office and they can do it.");
+    return;
+  }
+  const now = LATE[journeyId];
+  const answer = window.prompt(
+    (now ? "Showing as about " + now + " minutes late just now.\n\nHow late are we NOW?\n\n" +
+           "Changing it tells everybody AGAIN."
+         : "How late are we, in minutes?\n\nEverybody on this run with a mobile or an email " +
+           "is told straight away.") +
+    "\n\n5 minutes to 8 hours.", String(now || 30));
+  if(answer === null) return;
+  const mins = parseInt(String(answer).trim(), 10);
+  if(!mins || mins < 5 || mins > 480){
+    window.alert("Just the number of minutes, between 5 and 480.");
+    return;
+  }
+  const why = window.prompt(
+    "Why? This goes out in the text — short, the way you would say it.\n\n" +
+    "\"Roadworks at Achnasheen\", \"waiting on the ferry\".", "");
+  if(why === null) return;
+  try{
+    const r = await rpc("bus_delay_journey",
+      {p_journey_id: journeyId, p_minutes: mins, p_reason: why.trim() || null, p_from: "driver"});
+    if(r && r.ok === false){ window.alert(r.message || "It did not go through."); return; }
+    await loadLate([journeyId]);
+    render();
+    window.alert((r && r.message) || "Everybody has been told.");
+  }catch(e){ window.alert(say(e)); }
+}
+
+async function sayWeAreOnTime(journeyId){
+  if(!window.confirm("Stop showing this run as late?\n\nNobody gets a message — a text " +
+      "saying the bus is no longer late is not worth sending.")) return;
+  try{
+    await rpc("bus_clear_delay", {p_journey_id: journeyId});
+    await loadLate([journeyId]);
+    render();
+  }catch(e){ window.alert(say(e)); }
 }
 
 /* ------------------------------------------------------------------
@@ -960,6 +1051,9 @@ async function openDay(date, direction){
     ]);
     SHEET = {date, direction: keepDir, summary, rows: rows || [],
              fetched_at: new Date().toISOString()};
+    /* The same call the office makes, so the road and the office cannot
+       describe the same morning differently. */
+    await loadLate([...new Set((rows || []).map(r => r.journey_id).filter(Boolean))]);
     LOCAL = {};
     keep(K.sheet, SHEET);
     ONLINE = true;
