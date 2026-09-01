@@ -137,7 +137,7 @@
   <a href="home.html">All screens</a> ·
   <a href="driver.html">the driver's screen</a> ·
   <a href="./">what customers see</a> ·
-  <a href="route.html">the route and stops</a></footer>
+  <a href="route.html" target="_blank" rel="noopener">the route and stops</a></footer>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/4.7.1/maplibre-gl.min.js"></script>
 <script>
@@ -422,6 +422,7 @@ const take = {
   pickupId: "", destId: "",
   pin: null,             // {lat, lng, order, text} when picking up off-list
   pinMode: false,
+  snappedName: "",       // set when a tap landed on one of our own stops
   reqs: {},
   otherPassengers: "",
   note: "",
@@ -863,6 +864,15 @@ async function openAmend(b){
     landline: b.landline || "",
     note:     "",
     others:   b.other_passengers || "",
+    /* A booking already taken at somebody's door arrives WITH its pin, so
+       the panel shows where she actually stands rather than an empty
+       dropdown that would quietly move her to a stop on the next save. */
+    pin:      (b.pickup_latitude != null && b.pickup_longitude != null)
+                ? {lat: Number(b.pickup_latitude), lng: Number(b.pickup_longitude),
+                   order: Number(b.board_order), text: b.pickup_description || "A place on the road"}
+                : null,
+    pinMode:  false,
+    snappedName: "",
     error:    ""
   };
   /* The stop list for this direction must be IN HAND before the panel is
@@ -897,7 +907,30 @@ function renderAmend(){
       '<input id="am_pt" type="number" min="1" max="14" value="' + esc(AMEND.party) + '">' +
 
       '<label for="am_on">Where they get on</label>' +
-      '<select id="am_on">' + stopOptions(dir, AMEND.pickup) + '</select>' +
+      /* The same map the booking screen has. "She cannot get down to the
+         hall, pick her up at the gate" is the commonest correction there
+         is, and without this it meant cancelling a good booking and taking
+         it again. */
+      (AMEND.pin
+        ? '<div class="good">' + esc(AMEND.pin.text) + '<br>' +
+          '<span class="muted">A place on the road, not one of our stops. ' +
+          'Tap the map again to move it.</span></div>'
+        : '<select id="am_on">' + stopOptions(dir, AMEND.pickup) + '</select>') +
+      '<p></p><button class="btn secondary small" type="button" id="am_usepin">' +
+        (AMEND.pinMode ? "Hide the map"
+                       : (AMEND.pin ? "Show the map" : "Somewhere else on the road…")) +
+      '</button>' +
+      (AMEND.pin ? ' <button class="btn secondary small" type="button" id="am_clearpin">' +
+                   'Choose a stop instead</button>' : '') +
+      (AMEND.pinMode
+        ? '<div class="note">' +
+            (AMEND.snappedName
+              ? 'That is <strong>' + esc(AMEND.snappedName) + '</strong>, one of our own stops, ' +
+                'so it has been chosen for you. Tap somewhere else to change it.'
+              : 'Tap the road where the bus should pick them up. The bus still does not leave ' +
+                'its route.') +
+          '</div><div class="mapholder"><div id="amendmap"></div></div>'
+        : '') +
 
       /* Where they get off is limited to stops FURTHER ALONG the run than
          where they get on, exactly as it is when the booking is taken. A
@@ -931,7 +964,9 @@ function renderAmend(){
   const keep = () => {
     AMEND.party    = el("am_pt").value;
     const wasOn    = AMEND.pickup;
-    AMEND.pickup   = el("am_on").value;
+    /* The stop dropdown is not drawn at all while a pin is in force, so
+       reading it blindly would throw and lose the whole panel. */
+    if(el("am_on")) AMEND.pickup = el("am_on").value;
     AMEND.dest     = el("am_off").value;
     AMEND.mobile   = el("am_mob").value;
     AMEND.email    = el("am_em").value;
@@ -952,6 +987,15 @@ function renderAmend(){
   M().querySelectorAll("input,select,textarea").forEach(i => { i.onchange = keep; i.oninput = keep; });
   el("am_back").onclick = () => { AMEND = null; render(); };
   el("am_save").onclick = () => { keep(); saveAmend(false, null, false); };
+  if(el("am_usepin")) el("am_usepin").onclick = () => {
+    keep(); AMEND.pinMode = !AMEND.pinMode; renderAmend();
+  };
+  if(el("am_clearpin")) el("am_clearpin").onclick = () => {
+    keep(); AMEND.pin = null; AMEND.pinMode = false; AMEND.snappedName = "";
+    AMEND.pickup = AMEND.b.pickup_point_id || "";
+    renderAmend();
+  };
+  if(AMEND.pinMode) mountAmendMap();
 }
 
 /* Where a stop sits along the run, from the list the page already loaded.
@@ -967,17 +1011,114 @@ function amendBoardOrder(){
   return stopOrderOf(AMEND.b.direction || "outward", AMEND.pickup);
 }
 
+/* The amend panel gets its OWN map. Borrowing the booking screen's meant
+   moving one live element between two screens, and the office can be on
+   either at any moment - which is how a map ends up drawn in the wrong
+   panel, or blank in both. */
+let AMAP = null, AMAPEL = null, AMAPDIR = null, AMARKER = null;
+
+function mountAmendMap(){
+  const slot = el("amendmap");
+  if(!slot) return;
+  if(typeof maplibregl === "undefined"){
+    slot.innerHTML = '<p class="muted" style="padding:.8rem">The map could not be loaded. ' +
+      'Choose a stop from the list instead.</p>';
+    return;
+  }
+  const dir = (AMEND && AMEND.b.direction) || "outward";
+  if(!AMAPEL){
+    AMAPEL = document.createElement("div");
+    AMAPEL.style.cssText = "height:100%;width:100%";
+    slot.appendChild(AMAPEL);
+    AMAP = new maplibregl.Map({
+      container: AMAPEL,
+      style: {version: 8,
+        sources: {osm: {type: "raster", tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
+          tileSize: 256, attribution: "© OpenStreetMap contributors"}},
+        layers: [{id: "osm", type: "raster", source: "osm"}]},
+      center: [-5.0, 57.5], zoom: 7
+    });
+    if(!AMAP){ AMAPEL = null; return; }
+    AMAP.addControl(new maplibregl.NavigationControl({showCompass: false}));
+    AMAP.on("load", () => {
+      AMAP.addSource("route", {type: "geojson", data: {type: "FeatureCollection", features: []}});
+      AMAP.addLayer({id: "route", type: "line", source: "route",
+        paint: {"line-color": "#1f5f8b", "line-width": 4, "line-opacity": .85}});
+      syncAmendMap(true);
+    });
+    AMAP.on("click", e => {
+      if(!AMEND) return;
+      const d = AMEND.b.direction || "outward";
+      const line = routeFor(d);
+      if(!line) return;
+      const pt = projectToLine(line, [e.lngLat.lng, e.lngLat.lat]);
+      const info = describeAlong(d, pt.along);
+      if(info.snapped){
+        AMEND.pin = null;
+        AMEND.pickup = info.snapped.id;
+        AMEND.snappedName = info.snapped.name || info.snapped.n || "";
+      }else{
+        AMEND.pin = {lat: pt.point[1], lng: pt.point[0], order: info.order, text: info.text};
+        AMEND.pickup = "";
+        AMEND.snappedName = "";
+      }
+      renderAmend();
+    });
+  }else{
+    slot.appendChild(AMAPEL);
+    if(AMAP) AMAP.resize();
+  }
+  syncAmendMap(AMAPDIR !== dir);
+}
+
+function syncAmendMap(force){
+  if(!AMAP || !AMAP.getSource || !AMAP.getSource("route") || !AMEND) return;
+  const dir = AMEND.b.direction || "outward";
+  const gj = (CFG.routes || {})[dir];
+  const coords = gj && gj.geometry && gj.geometry.coordinates;
+  AMAP.getSource("route").setData(coords
+    ? {type: "Feature", geometry: {type: "LineString", coordinates: coords}}
+    : {type: "FeatureCollection", features: []});
+  if(coords && force){
+    const b = new maplibregl.LngLatBounds();
+    coords.forEach(c => b.extend(c));
+    AMAP.fitBounds(b, {padding: 30, duration: 0});
+    AMAPDIR = dir;
+  }
+  if(AMEND.pin){
+    if(!AMARKER) AMARKER = new maplibregl.Marker({color: "#a3241c"})
+      .setLngLat([AMEND.pin.lng, AMEND.pin.lat]).addTo(AMAP);
+    else AMARKER.setLngLat([AMEND.pin.lng, AMEND.pin.lat]);
+  }else if(AMARKER){ AMARKER.remove(); AMARKER = null; }
+}
+
 async function saveAmend(override, overrideReason, confirmNoContact){
   const b = AMEND.b;
   const dir = b.direction || "outward";
   const stopOrder = id => stopOrderOf(dir, id);
   /* Only send what actually changed. A null tells the database to leave a
      field alone, so a box nobody touched can never blank something. */
+  /* A pinned place and a stop are the same field on the booking, so only
+     one of them may travel. The pin wins when there is one, because it is
+     the more specific thing the office was told. */
+  const pinnedNow  = !!AMEND.pin;
+  const pinMoved   = pinnedNow && (
+      Number(b.pickup_latitude)  !== AMEND.pin.lat ||
+      Number(b.pickup_longitude) !== AMEND.pin.lng ||
+      (b.pickup_description || "") !== AMEND.pin.text);
+
   const args = {
     p_booking_id: b.booking_id,
     p_party_size: Number(AMEND.party) !== Number(b.party_size) ? Number(AMEND.party) : null,
-    p_pickup_point_id: AMEND.pickup && AMEND.pickup !== b.pickup_point_id ? AMEND.pickup : null,
-    p_board_route_order: AMEND.pickup && AMEND.pickup !== b.pickup_point_id ? stopOrder(AMEND.pickup) : null,
+    p_pickup_latitude:    pinMoved ? AMEND.pin.lat  : null,
+    p_pickup_longitude:   pinMoved ? AMEND.pin.lng  : null,
+    p_pickup_description: pinMoved ? AMEND.pin.text : null,
+    p_pickup_point_id: (!pinnedNow && AMEND.pickup && AMEND.pickup !== b.pickup_point_id)
+                         ? AMEND.pickup : null,
+    p_board_route_order:
+      pinMoved ? AMEND.pin.order
+      : ((!pinnedNow && AMEND.pickup && AMEND.pickup !== b.pickup_point_id)
+           ? stopOrder(AMEND.pickup) : null),
     p_destination_point_id: AMEND.dest && AMEND.dest !== b.destination_point_id ? AMEND.dest : null,
     p_alight_route_order: AMEND.dest && AMEND.dest !== b.destination_point_id ? stopOrder(AMEND.dest) : null,
     p_note: AMEND.note.trim() ? AMEND.note.trim() : null,
@@ -1178,20 +1319,35 @@ function renderTake(){
 
     '<label for="pu">Picking up at</label>';
 
+  /* THE MAP STAYS OPEN. It used to vanish the instant you tapped it, which
+     left whoever was on the telephone wondering whether the tap had landed
+     where they meant - and with no way to look. Now the pin sits on the map
+     you tapped, the words underneath say where it is, and you can tap again
+     to move it as many times as it takes. Closing it is a decision, not
+     something that happens to you. */
   if(take.pin){
     html += '<div class="good">' + esc(take.pin.text) + '<br>' +
-      '<span class="muted">A place on the road, not one of our stops.</span></div>' +
-      '<button class="btn secondary small" id="clearpin">Choose a stop instead</button>';
+      '<span class="muted">A place on the road, not one of our stops. ' +
+      'Tap the map again to move it.</span></div>';
   }else{
-    html += '<select id="pu">' + stopOptions(take.direction, take.pickupId, null) + '</select>' +
-      '<p></p><button class="btn secondary small" id="usepin">' +
-        (take.pinMode ? "Hide the map" : "Somewhere else on the road…") + '</button>';
-    if(take.pinMode){
-      html += '<div class="note">Tap the road where the bus should stop. Staff are not held to ' +
-        'the village rule the website follows — if somebody genuinely cannot get to a stop, ' +
-        'you may pin their door. The bus still does not leave the route.</div>' +
-        '<div class="mapholder"><div id="staffmap"></div></div>';
-    }
+    html += '<select id="pu">' + stopOptions(take.direction, take.pickupId, null) + '</select>';
+  }
+
+  html += '<p></p><button class="btn secondary small" id="usepin">' +
+    (take.pinMode ? "Hide the map" : (take.pin ? "Show the map" : "Somewhere else on the road…")) +
+    '</button>' +
+    (take.pin ? ' <button class="btn secondary small" id="clearpin">Choose a stop instead</button>' : '');
+
+  if(take.pinMode){
+    html += '<div class="note">' +
+      (take.snappedName
+        ? 'That is <strong>' + esc(take.snappedName) + '</strong>, one of our own stops, so it has ' +
+          'been chosen for you above. Tap somewhere else to change it.'
+        : 'Tap the road where the bus should stop. Staff are not held to the village rule the ' +
+          'website follows — if somebody genuinely cannot get to a stop, you may pin their door. ' +
+          'The bus still does not leave the route.') +
+      '</div>' +
+      '<div class="mapholder"><div id="staffmap"></div></div>';
   }
 
   html += '<label for="de">Setting down at</label>' +
@@ -1244,7 +1400,7 @@ function renderTake(){
 
   M().innerHTML = html;
   wireTake();
-  if(take.pinMode && !take.pin) mountStaffMap();
+  if(take.pinMode) mountStaffMap();
 }
 
 function wireTake(){
@@ -1316,6 +1472,15 @@ let SMAPEL = null, SMAP = null, SMARKER = null, SMAPDIR = null;
 function mountStaffMap(){
   const slot = el("staffmap");
   if(!slot) return;
+  /* The map library comes from the internet and the office's connection is
+     not always there. Without this guard the whole booking screen dies on a
+     bad morning - and the office loses the ability to take a booking at all
+     because a decoration would not load. The stop list still works. */
+  if(typeof maplibregl === "undefined"){
+    slot.innerHTML = '<p class="muted" style="padding:.8rem">The map could not be loaded. ' +
+      'Choose a stop from the list instead, or write where they are in the note.</p>';
+    return;
+  }
   if(!SMAPEL){
     SMAPEL = document.createElement("div");
     SMAPEL.style.cssText = "height:100%;width:100%";
@@ -1328,6 +1493,7 @@ function mountStaffMap(){
         layers: [{id: "osm", type: "raster", source: "osm"}]},
       center: [-5.0, 57.5], zoom: 7
     });
+    if(!SMAP){ SMAPEL = null; return; }
     SMAP.addControl(new maplibregl.NavigationControl({showCompass: false}));
     SMAP.on("load", () => {
       SMAP.addSource("route", {type: "geojson", data: {type: "FeatureCollection", features: []}});
@@ -1341,18 +1507,23 @@ function mountStaffMap(){
       const p = projectToLine(line, [e.lngLat.lng, e.lngLat.lat]);
       const info = describeAlong(take.direction, p.along);
       if(info.snapped){
+        /* Tapping inside a village lands on that village's own stop. The map
+           STAYS OPEN and says which one it chose - closing it here was the
+           same fault as closing it on a pin: the office is left guessing
+           what just happened. */
         take.pin = null;
         take.pickupId = info.snapped.id;
-        take.pinMode = false;
+        take.snappedName = info.snapped.name || info.snapped.n || "";
       }else{
         take.pin = {lat: p.point[1], lng: p.point[0], order: info.order, text: info.text};
         take.pickupId = "";
+        take.snappedName = "";
       }
       render();
     });
   }else{
     slot.appendChild(SMAPEL);
-    SMAP.resize();
+    if(SMAP) SMAP.resize();
   }
   syncStaffMap(false);
 }
@@ -1525,7 +1696,8 @@ function resetTake(){
   Object.assign(take, {
     date: d, direction: dir, customer: null, search: "", results: null, searching: false,
     newName: "", homeArea: "", mobile: "", landline: "", email: "", party: 1,
-    pickupId: "", destId: "", pin: null, pinMode: false, reqs: {}, otherPassengers: "",
+    pickupId: "", destId: "", pin: null, pinMode: false, snappedName: "",
+    reqs: {}, otherPassengers: "",
     note: "", override: false, overrideReason: "",
     ackNoMessages: false, ackNeeded: false, busy: false, error: null, done: null,
     /* Cleared deliberately. A linkTo left behind from an earlier booking

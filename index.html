@@ -161,6 +161,7 @@
         vertical-align:middle; margin-right:.5rem;}
   @keyframes sp{to{transform:rotate(360deg)}}
   @media (max-width:420px){ body{font-size:18px;} .card{padding:1.2rem;} }
+  .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 </style>
 </head>
 <body>
@@ -181,7 +182,7 @@
 </main>
 
 <footer>
-  <p style="margin:0 0 .8rem"><a href="route.html">The route, the stops and the times</a></p>
+  <p style="margin:0 0 .8rem"><a href="route.html" target="_blank" rel="noopener">The route, the stops and the times<span class="sr-only"> (opens in a new tab)</span></a></p>
   Lochcarron Garage, Lochcarron, Ross-shire IV54 8YS<br>
   Telephone <a class="tel" href="tel:01520722997">01520 722997</a>
 </footer>
@@ -537,7 +538,7 @@ function start(){
     '</div>' +
     '<button class="primary" onclick="START()">Book the Bus</button>' +
     '<button class="secondary" onclick="CANCELSTART()">Cancel a booking</button>' +
-    '<a class="btn secondary linkbtn" href="route.html">See the route and all the stops</a>' +
+    '<a class="btn secondary linkbtn" href="route.html" target="_blank" rel="noopener">See the route and all the stops</a>' +
   '</div>');
 }
 window.START = () => next();
