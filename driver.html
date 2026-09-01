@@ -99,6 +99,8 @@
          background:rgba(255,255,255,.96);border-top:1px solid var(--line);
          display:flex;gap:.5rem;max-width:760px;margin:0 auto}
   .stick .btn{min-height:52px}
+  .card.changed{border-left:5px solid var(--amber)}
+  .btn.small{min-height:44px;font-size:.95rem;margin-top:.5rem}
   .hidden{display:none !important}
 </style>
 </head>
@@ -564,8 +566,104 @@ function renderEndOfRun(){
       '</select></div>';
   });
 
+  /* ------------------------------------------------------------------
+     DID ANYBODY GET OFF SOMEWHERE DIFFERENT?
+     ------------------------------------------------------------------
+     The operator's own design, and the reason this section is a LIST
+     rather than a set of questions:
+
+       "Unless you do it that it stays what's been booked and Malcolm
+        changes anything different."
+
+     So every passenger is already answered - it says where they booked
+     to - and he touches only the ones who did something else. A day where
+     everybody did what they said needs no taps at all and stores nothing.
+     Putting one back to its booked stop removes the correction, which is
+     also how he undoes a mis-tap without a delete button.
+
+     It lives here rather than on the run because he said so: "It ok
+     doesn't need to be done when he's driving, he generally stops to let
+     them off." Nothing on the roadside screen changed. */
+  const carried = (SHEET && SHEET.rows ? SHEET.rows : []).filter(r => {
+    const st = LOCAL[r.booking_id] !== undefined ? LOCAL[r.booking_id]
+             : (r.boarded ? "boarded" : (r.no_show ? "no_show" : null));
+    return st !== "no_show";
+  });
+
+  if(carried.length){
+    const changed = carried.filter(r => r.got_off_is_a_difference).length;
+    html += '<div class="card"><h2>Did anybody get off somewhere different?</h2>' +
+      '<p class="muted">Everybody below is already down as getting off where they booked. ' +
+      'Only change the ones who did not — if nobody did, there is nothing to do here.</p>' +
+      (changed
+        ? '<div class="good">' + changed +
+          (changed === 1 ? ' passenger got' : ' passengers got') + ' off somewhere different.</div>'
+        : '') +
+      '</div>';
+
+    carried.forEach(r => {
+      const opts = (STOPS[r.direction] || STOPS[(SHEET && SHEET.direction) || "outward"] || []);
+      html += '<div class="card' + (r.got_off_is_a_difference ? ' changed' : '') +
+        '" data-b="' + esc(r.booking_id) + '">' +
+        '<div class="name">' + esc(r.lead_name) + ' · ' + r.party_size +
+          (Number(r.party_size) === 1 ? " person" : " people") + '</div>' +
+        '<div class="sub">on at ' + esc(r.pickup) + ' · booked off at ' + esc(r.drop_off) + '</div>' +
+        (r.got_off_is_a_difference
+          ? '<div class="note">Got off at <strong>' + esc(r.got_off_at) + '</strong> — ' +
+            'not where they booked. Set it back to ' + esc(r.drop_off) + ' to undo this.</div>'
+          : '') +
+        '<label>Where did they actually get off?</label>' +
+        '<select data-off="' + esc(r.booking_id) + '">' +
+          opts.map(st =>
+            '<option value="' + esc(st.id) + '"' +
+            ((r.got_off_point_id && st.id === r.got_off_point_id) ||
+             (!r.got_off_is_a_difference && st.n === r.drop_off) ? ' selected' : '') +
+            '>' + esc(st.n) + (st.n === r.drop_off ? ' (as booked)' : '') + '</option>').join("") +
+        '</select>' +
+        /* Somewhere with no name is where people actually get off on this
+           road, and it is on no list. */
+        '<button class="btn ghost small" data-elsewhere="' + esc(r.booking_id) + '">' +
+          'Somewhere with no name…</button>' +
+        '</div>';
+    });
+  }
+
   html += '<button class="btn ghost" id="back2">Back to the run</button>';
   M().innerHTML = html;
+
+  /* Where a booked passenger actually got off. */
+  M().querySelectorAll("select[data-off]").forEach(sel => {
+    sel.onchange = async () => {
+      const id = sel.dataset.off;
+      if(!sel.value) return;
+      try{
+        await rpc("bus_driver_different_alighting",
+          {p_booking_id: id, p_pickup_point_id: sel.value});
+        /* Re-fetch the run, not just this screen: the correction lives on
+           the sheet now, and a stale sheet would show his own change as
+           not having happened. */
+        await openDay(SHEET.date, SHEET.direction);
+        VIEW = "endofrun";
+        await loadEndOfRun();
+      }catch(e){ window.alert(say(e)); }
+    };
+  });
+  M().querySelectorAll("button[data-elsewhere]").forEach(btn => {
+    btn.onclick = async () => {
+      const id = btn.dataset.elsewhere;
+      const where = window.prompt(
+        "Where did they get off?\n\nWrite it the way you would say it — " +
+        "\"the passing place past the second cattle grid\".", "");
+      if(!where || !where.trim()) return;
+      try{
+        await rpc("bus_driver_different_alighting",
+          {p_booking_id: id, p_description: where.trim()});
+        await openDay(SHEET.date, SHEET.direction);
+        VIEW = "endofrun";
+        await loadEndOfRun();
+      }catch(e){ window.alert(say(e)); }
+    };
+  });
 
   M().querySelectorAll("select[data-kind]").forEach(sel => {
     sel.onchange = async () => {
